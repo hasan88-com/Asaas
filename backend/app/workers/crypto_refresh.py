@@ -62,15 +62,20 @@ async def refresh_crypto_prices():
                 if not inst:
                     continue
 
-                # Add to DB
-                db_price = Price(
+                # Upsert into DB
+                from sqlalchemy.dialects.postgresql import insert as pg_insert
+                insert_vals = dict(
                     instrument_id=inst.id,
                     price=float(price_val),
                     price_date=now.date(),
                     source="coingecko_refresh",
                     fetched_at=now,
                 )
-                session.add(db_price)
+                stmt = pg_insert(Price).values(**insert_vals).on_conflict_do_update(
+                    index_elements=["instrument_id", "price_date"],
+                    set_={k: v for k, v in insert_vals.items() if k not in ("instrument_id", "price_date")},
+                )
+                await session.execute(stmt)
 
                 # Update hot cache (60 seconds TTL)
                 await set_cached_price(symbol, price_val, 60)

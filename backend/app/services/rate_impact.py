@@ -88,14 +88,20 @@ class RateImpactService:
 
             new_yield = latest_yield + delta_rate
 
-            # Save new price/yield record
-            db_price = Price(
+            # Upsert new price/yield record into DB
+            from sqlalchemy.dialects.postgresql import insert as pg_insert
+            insert_vals = dict(
                 instrument_id=security.id,
                 price=float(new_yield),
                 price_date=datetime.now(timezone.utc).date(),
                 source="sbp_rate_impact",
+                fetched_at=datetime.now(timezone.utc),
             )
-            self.db.add(db_price)
+            stmt = pg_insert(Price).values(**insert_vals).on_conflict_do_update(
+                index_elements=["instrument_id", "price_date"],
+                set_={k: v for k, v in insert_vals.items() if k not in ("instrument_id", "price_date")},
+            )
+            await self.db.execute(stmt)
             logger.info(f"Updated yield for {symbol}: {latest_yield:.2%} → {new_yield:.2%}")
 
         await self.db.commit()
