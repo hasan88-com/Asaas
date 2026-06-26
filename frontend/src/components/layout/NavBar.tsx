@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 interface NavItem {
   to: string
   label: string
-  icon: React.ComponentType<{ size?: number; className?: string }>
+  icon: React.ComponentType<any>
 }
 
 const NAV_ITEMS: NavItem[] = [

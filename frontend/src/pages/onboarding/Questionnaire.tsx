@@ -78,8 +78,8 @@ export default function Questionnaire() {
     setAnswers((a) => ({ ...a, [current.id]: value }))
   }
 
-  const toggleMulti = (qId: string, value: string, setter: typeof setAnswers | ((fn: (p: Record<string, string[]>) => Record<string, string[]>) => void)) => {
-    setter((prev: Record<string, string | string[]> | Record<string, string[]>) => {
+  const toggleMulti = (qId: string, value: string, setter: any) => {
+    setter((prev: any) => {
       const key = qId
       const old = (prev[key] as string[] | undefined) ?? []
       return {

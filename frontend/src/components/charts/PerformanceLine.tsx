@@ -8,6 +8,7 @@ import {
   Tooltip,
   Filler,
 } from 'chart.js'
+import type { TooltipItem } from 'chart.js'
 import { Line } from 'react-chartjs-2'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler)
@@ -73,9 +74,9 @@ function PerformanceLineImpl({ history, height = 240, lineColor = '#0F6E56' }: P
         titleColor: '#7C867F',
         bodyColor: '#F6F4ED',
         titleFont: { family: '"IBM Plex Mono"', size: 11 },
-        bodyFont: { family: '"IBM Plex Mono"', size: 13, weight: '500' as const },
+        bodyFont: { family: '"IBM Plex Mono"', size: 13, weight: 500 as const },
         callbacks: {
-          label: (ctx: { parsed: { y: number } }) => fmtPKR(ctx.parsed.y),
+          label: (tooltipItem: TooltipItem<'line'>) => fmtPKR(tooltipItem.parsed?.y ?? 0),
         },
       },
     },
