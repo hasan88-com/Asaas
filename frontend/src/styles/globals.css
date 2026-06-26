@@ -1,0 +1,294 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* CSS custom properties — DESIGN.md §9 warm paper palette */
+:root {
+  --paper: #F6F4ED;
+  --card: #FFFEFB;
+  --ink: #16201C;
+  --ink-soft: #4A564F;
+  --ink-faint: #7C867F;
+  --line: #DCD8CC;
+  --line-soft: #E8E4D9;
+  --jade: #0F6E56;
+  --jade-soft: #E1F1EA;
+  --gold: #B8801A;
+  --gold-soft: #F6ECD6;
+  --gain: #0F6E56;
+  --loss: #A8401F;
+  --loss-soft: #F6E3DA;
+  --info: #2F4858;
+  --info-soft: #E2E9EE;
+  --rose: #925B6A;
+  --rose-soft: #F2E4E8;
+  --plum: #5A3D6B;
+  --plum-soft: #EDE4F2;
+  --ac-stock: #0F6E56;
+  --ac-crypto: #5A3D6B;
+  --ac-tbill: #2F4858;
+  --ac-commodity: #B8801A;
+  --ac-fund: #3E7C8C;
+
+  /* Easing tokens (DESIGN.md §5c, §6) */
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: var(--paper);
+  }
+
+  /* All numbers tabular — DESIGN.md §3 */
+  .font-mono,
+  [class*="font-mono"] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Streaming indicator dots (DESIGN.md §5c.1)                          */
+/* ------------------------------------------------------------------ */
+.streaming-dot {
+  animation: dot-pulse 1s ease infinite;
+}
+.streaming-dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+.streaming-dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+/* Tool-running ring — only continuous motion permitted in chat */
+.tool-ring {
+  animation: tool-spin 1s linear infinite;
+  transform-origin: center;
+}
+
+/* Message entry — 200ms ease-out slide-up (DESIGN.md §5c.1) */
+.message-enter {
+  animation: slide-up 200ms var(--ease-out) both;
+}
+
+/* Card entry — same as message, stagger applied via animation-delay */
+.card-enter {
+  animation: slide-up 200ms var(--ease-out) both;
+}
+
+/* ------------------------------------------------------------------ */
+/* prefers-reduced-motion — DESIGN.md §8 (mandatory)                   */
+/* ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Focus ring — jade, visible on every interactive element (§8)        */
+/* ------------------------------------------------------------------ */
+@layer base {
+  :focus-visible {
+    outline: 2px solid var(--jade);
+    outline-offset: 2px;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Dashboard chat drawer — edge slide (DESIGN.md §5c.3)                */
+/* ------------------------------------------------------------------ */
+.drawer-enter {
+  animation: drawer-slide-up 300ms var(--ease-drawer) both;
+}
+.drawer-exit {
+  animation: drawer-slide-down 200ms var(--ease-in-out) both;
+}
+
+@keyframes drawer-slide-up {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+@keyframes drawer-slide-down {
+  from { transform: translateY(0); }
+  to   { transform: translateY(100%); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Scrollbar — minimal, warm                                            */
+/* ------------------------------------------------------------------ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border-radius: 3px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Skeleton loading — shimmer effect (DESIGN.md §5d.2)                  */
+/* ------------------------------------------------------------------ */
+.skeleton {
+  background: linear-gradient(90deg, var(--line-soft) 25%, var(--line) 50%, var(--line-soft) 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  border-radius: var(--radius-sm, 6px);
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Skeleton variants */
+.skeleton-text {
+  height: 14px;
+  width: 100%;
+  border-radius: 4px;
+}
+.skeleton-text-sm {
+  height: 12px;
+  width: 60%;
+  border-radius: 4px;
+}
+.skeleton-circle {
+  border-radius: 50%;
+}
+.skeleton-rect {
+  border-radius: 8px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Count-up animation — hero value (DESIGN.md §5d.6)                    */
+/* ------------------------------------------------------------------ */
+.count-up-enter {
+  animation: count-up 400ms ease-out both;
+}
+
+@keyframes count-up {
+  0% { opacity: 0; transform: translateY(8px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ------------------------------------------------------------------ */
+/* Tooltip — contextual help (DESIGN.md §5d.4)                          */
+/* ------------------------------------------------------------------ */
+.tooltip-trigger {
+  position: relative;
+}
+.tooltip-trigger .tooltip-content {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--card);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.4;
+  max-width: 280px;
+  width: max-content;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 150ms ease;
+  z-index: 50;
+  box-shadow: 0 4px 12px rgba(22,32,28,.15);
+}
+.tooltip-trigger .tooltip-content::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: var(--ink);
+}
+.tooltip-trigger:hover .tooltip-content,
+.tooltip-trigger:focus-within .tooltip-content {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ------------------------------------------------------------------ */
+/* Flag dismiss animation (DESIGN.md §5d.3)                             */
+/* ------------------------------------------------------------------ */
+.flag-dismiss {
+  animation: flag-slide-out 300ms ease-out forwards;
+}
+
+@keyframes flag-slide-out {
+  0% { opacity: 1; transform: translateX(0); max-height: 200px; }
+  50% { opacity: 0; transform: translateX(20px); }
+  100% { opacity: 0; transform: translateX(20px); max-height: 0; padding: 0; margin: 0; overflow: hidden; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Button press feedback (DESIGN.md §5d.3)                              */
+/* ------------------------------------------------------------------ */
+.btn-press {
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.btn-press:active {
+  transform: scale(0.97);
+}
+
+/* ------------------------------------------------------------------ */
+/* Holdings row expand/collapse (DESIGN.md §5d.1)                       */
+/* ------------------------------------------------------------------ */
+.holdings-expand-enter {
+  animation: holdings-expand 200ms ease-out both;
+}
+.holdings-expand-exit {
+  animation: holdings-collapse 150ms ease-in both;
+}
+
+@keyframes holdings-expand {
+  from { opacity: 0; max-height: 0; }
+  to { opacity: 1; max-height: 200px; }
+}
+@keyframes holdings-collapse {
+  from { opacity: 1; max-height: 200px; }
+  to { opacity: 0; max-height: 0; }
+}
+
+/* ------------------------------------------------------------------ */
+/* Empty state illustration placeholder                                  */
+/* ------------------------------------------------------------------ */
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: var(--jade-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 16px;
+}
+.empty-state-icon svg {
+  width: 36px;
+  height: 36px;
+  color: var(--jade);
+}

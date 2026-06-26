@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PRD — Agentic Wealth Management Platform (Pakistan)</title>
+<style>
+  :root{
+    --ink:#16201c;
+    --ink-soft:#4a564f;
+    --ink-faint:#7c867f;
+    --paper:#f6f4ed;
+    --card:#fffefb;
+    --line:#dcd8cc;
+    --line-soft:#e8e4d9;
+    --jade:#0f6e56;
+    --jade-soft:#e1f1ea;
+    --gold:#b8801a;
+    --gold-soft:#f6ecd6;
+    --rust:#a8401f;
+    --rust-soft:#f6e3da;
+    --slate:#2f4858;
+    --slate-soft:#e2e9ee;
+    --plum:#5a3d6b;
+    --plum-soft:#ede4f2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html{scroll-behavior:smooth;}
+  body{
+    font-family:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+    background:var(--paper);
+    color:var(--ink);
+    line-height:1.65;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:920px;margin:0 auto;padding:0 28px;}
+
+  /* ---- Masthead ---- */
+  .masthead{
+    border-bottom:2px solid var(--ink);
+    padding:64px 0 28px;
+    margin-bottom:8px;
+  }
+  .kicker{
+    font-family:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+    font-size:11px;letter-spacing:.22em;text-transform:uppercase;
+    color:var(--jade);font-weight:600;margin-bottom:20px;
+    display:flex;gap:14px;flex-wrap:wrap;align-items:center;
+  }
+  .kicker .dot{width:5px;height:5px;border-radius:50%;background:var(--gold);display:inline-block;}
+  h1.title{
+    font-size:clamp(34px,6vw,56px);
+    line-height:1.04;font-weight:600;letter-spacing:-.02em;
+    margin-bottom:18px;max-width:16ch;
+  }
+  .standfirst{
+    font-size:19px;color:var(--ink-soft);max-width:62ch;
+    font-style:italic;
+  }
+  .meta-row{
+    display:flex;gap:32px;flex-wrap:wrap;margin-top:28px;
+    font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px;
+    color:var(--ink-faint);
+  }
+  .meta-row b{color:var(--ink);font-weight:600;display:block;letter-spacing:.04em;}
+  .meta-row span{letter-spacing:.02em;}
+
+  /* ---- TOC ---- */
+  nav.toc{
+    margin:40px 0 56px;padding:24px 28px;
+    background:var(--card);border:1px solid var(--line);
+    border-radius:10px;
+  }
+  nav.toc h4{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--ink-faint);margin-bottom:16px;font-weight:600;
+  }
+  nav.toc ol{list-style:none;counter-reset:toc;
+    columns:2;column-gap:48px;}
+  nav.toc li{counter-increment:toc;margin-bottom:9px;break-inside:avoid;}
+  nav.toc a{
+    text-decoration:none;color:var(--ink);font-size:15px;
+    display:flex;gap:12px;align-items:baseline;
+  }
+  nav.toc a::before{
+    content:counter(toc,decimal-leading-zero);
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--jade);
+    font-weight:600;flex-shrink:0;
+  }
+  nav.toc a:hover{color:var(--jade);}
+
+  /* ---- Sections ---- */
+  section{margin-bottom:60px;scroll-margin-top:24px;}
+  .sec-head{
+    display:flex;align-items:baseline;gap:16px;
+    border-bottom:1px solid var(--line);
+    padding-bottom:12px;margin-bottom:24px;
+  }
+  .sec-num{
+    font-family:"IBM Plex Mono",monospace;font-size:13px;
+    color:var(--jade);font-weight:600;letter-spacing:.05em;
+  }
+  h2{font-size:27px;font-weight:600;letter-spacing:-.01em;line-height:1.2;}
+  h3{font-size:19px;font-weight:600;margin:30px 0 12px;letter-spacing:-.005em;}
+  p{margin-bottom:16px;max-width:70ch;}
+  p.lead{font-size:17px;color:var(--ink-soft);}
+  strong{font-weight:600;}
+  em{font-style:italic;}
+  a.inline{color:var(--jade);text-decoration:underline;text-underline-offset:2px;text-decoration-thickness:1px;}
+
+  ul.clean{list-style:none;margin:0 0 18px;max-width:70ch;}
+  ul.clean li{
+    position:relative;padding-left:24px;margin-bottom:11px;
+  }
+  ul.clean li::before{
+    content:"";position:absolute;left:4px;top:11px;
+    width:6px;height:6px;border-radius:1px;background:var(--gold);
+    transform:rotate(45deg);
+  }
+
+  /* ---- Callout ---- */
+  .callout{
+    border-left:3px solid var(--jade);
+    background:var(--jade-soft);
+    padding:18px 22px;border-radius:0 8px 8px 0;
+    margin:22px 0;max-width:72ch;
+  }
+  .callout.gold{border-color:var(--gold);background:var(--gold-soft);}
+  .callout.rust{border-color:var(--rust);background:var(--rust-soft);}
+  .callout .lbl{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.18em;
+    text-transform:uppercase;font-weight:600;margin-bottom:6px;color:var(--ink-soft);
+  }
+  .callout p{margin:0;font-size:15px;}
+
+  /* ---- Tables ---- */
+  .tbl-wrap{margin:22px 0;overflow-x:auto;border:1px solid var(--line);border-radius:9px;}
+  table{width:100%;border-collapse:collapse;font-size:14.5px;background:var(--card);}
+  th{
+    text-align:left;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    letter-spacing:.1em;text-transform:uppercase;color:var(--ink-soft);
+    padding:13px 16px;border-bottom:1.5px solid var(--line);font-weight:600;
+    background:var(--paper);
+  }
+  td{padding:12px 16px;border-bottom:1px solid var(--line-soft);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  td strong{color:var(--ink);}
+  .pill{
+    display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10.5px;
+    padding:2px 9px;border-radius:20px;font-weight:600;letter-spacing:.02em;white-space:nowrap;
+  }
+  .pill.p1{background:var(--jade-soft);color:var(--jade);}
+  .pill.p2{background:var(--gold-soft);color:var(--gold);}
+  .pill.p3{background:var(--slate-soft);color:var(--slate);}
+  .pill.cut{background:var(--rust-soft);color:var(--rust);}
+
+  /* ---- Figure / flowchart ---- */
+  figure{margin:32px 0;}
+  .fig-frame{
+    background:var(--card);border:1px solid var(--line);border-radius:12px;
+    padding:28px 24px 20px;
+  }
+  figcaption{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.06em;
+    color:var(--ink-faint);margin-top:14px;text-align:center;
+  }
+  figcaption b{color:var(--jade);font-weight:600;}
+  svg{display:block;width:100%;height:auto;}
+  .svg-t{font-family:"IBM Plex Mono",ui-monospace,monospace;}
+  .svg-label{font-family:"Iowan Old Style",Georgia,serif;}
+
+  /* ---- Phase cards ---- */
+  .phases{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:24px 0;}
+  .phase{
+    background:var(--card);border:1px solid var(--line);border-radius:10px;
+    padding:20px;position:relative;overflow:hidden;
+  }
+  .phase::before{content:"";position:absolute;top:0;left:0;width:100%;height:3px;}
+  .phase.one::before{background:var(--slate);}
+  .phase.two::before{background:var(--jade);}
+  .phase.three::before{background:var(--plum);}
+  .phase .pn{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.1em;
+    color:var(--ink-faint);font-weight:600;margin-bottom:8px;
+  }
+  .phase h4{font-size:17px;font-weight:600;margin-bottom:8px;}
+  .phase p{font-size:13.5px;color:var(--ink-soft);margin:0;max-width:none;}
+
+  /* ---- Decision box ---- */
+  .decisions{margin:24px 0;}
+  .decision{
+    display:flex;gap:18px;padding:16px 0;border-bottom:1px solid var(--line-soft);
+  }
+  .decision:last-child{border-bottom:none;}
+  .decision .q{flex:1;}
+  .decision .q b{display:block;margin-bottom:3px;}
+  .decision .q span{font-size:14px;color:var(--ink-soft);}
+  .decision .verdict{
+    flex-shrink:0;width:170px;font-size:13.5px;color:var(--jade);
+    font-weight:600;border-left:2px solid var(--jade-soft);padding-left:16px;
+  }
+
+  /* ---- Footer ---- */
+  footer{
+    border-top:2px solid var(--ink);margin-top:40px;padding:28px 0 80px;
+    font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--ink-faint);
+    display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  }
+
+  @media (max-width:680px){
+    .phases{grid-template-columns:1fr;}
+    nav.toc ol{columns:1;}
+    .decision{flex-direction:column;gap:8px;}
+    .decision .verdict{width:auto;border-left:none;border-top:2px solid var(--jade-soft);padding:8px 0 0;}
+    .meta-row{gap:20px;}
+  }
+  @media print{
+    body{background:#fff;}
+    .fig-frame,.phase,nav.toc,.tbl-wrap{break-inside:avoid;}
+    section{break-inside:avoid-page;}
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="wrap">
+    <div class="kicker">
+      <span>Product Requirements</span><span class="dot"></span>
+      <span>v1.0 — MVP scope</span><span class="dot"></span>
+      <span>Pakistan market</span>
+    </div>
+    <h1 class="title">Agentic wealth management platform</h1>
+    <p class="standfirst">A conversational agent that builds a diversified, risk-minimized portfolio for each user, then watches the market on their behalf — flagging news that matters, never acting without permission.</p>
+    <div class="meta-row">
+      <div><b>Audience</b><span>Pakistani retail investors</span></div>
+      <div><b>Stack</b><span>FastAPI · React/Vite · PostgreSQL</span></div>
+      <div><b>Model tier</b><span>Free-first (Gemini · Groq)</span></div>
+      <div><b>Status</b><span>Architecture locked</span></div>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+
+  <nav class="toc">
+    <h4>Contents</h4>
+    <ol>
+      <li><a href="#problem">Problem &amp; opportunity</a></li>
+      <li><a href="#vision">Product vision</a></li>
+      <li><a href="#users">Users &amp; modes</a></li>
+      <li><a href="#lifecycle">The agent lifecycle</a></li>
+      <li><a href="#mainflow">End-to-end flow</a></li>
+      <li><a href="#newsflow">News &amp; materiality flow</a></li>
+      <li><a href="#data">Data layer</a></li>
+      <li><a href="#llm">LLM routing</a></li>
+      <li><a href="#features">Feature requirements</a></li>
+      <li><a href="#decisions">Open decisions</a></li>
+      <li><a href="#scope">MVP scope &amp; cuts</a></li>
+      <li><a href="#risks">Risks &amp; guardrails</a></li>
+    </ol>
+  </nav>
+
+  <!-- 1. PROBLEM -->
+  <section id="problem">
+    <div class="sec-head"><span class="sec-num">01</span><h2>Problem &amp; opportunity</h2></div>
+    <p class="lead">Retail investors in Pakistan have capital and intent but no accessible way to build and manage a diversified portfolio across the asset classes available to them.</p>
+    <p>Existing tools either track a single asset class, assume a sophistication the average user lacks, or are priced for institutions. Meanwhile the data that <em>would</em> power a good advisor — PSX prices, SBP rate moves, dividend announcements, commodity trends — is scattered, partly free, and never assembled into one decision-making view. The investor is left reacting to news they may not even know affects their holdings.</p>
+    <ul class="clean">
+      <li><strong>Fragmented data.</strong> PSX, T-bills, commodities, and crypto each live behind different sources with different access models.</li>
+      <li><strong>No personalization.</strong> Generic market news isn't filtered to what a specific person actually holds.</li>
+      <li><strong>No continuity.</strong> Tools recommend once and stop; nobody watches the portfolio after the money is in.</li>
+      <li><strong>Local constraints ignored.</strong> Most models use a 0% risk-free rate; in Pakistan, the SBP policy rate is a dominant factor that changes every allocation.</li>
+    </ul>
+    <div class="callout">
+      <div class="lbl">Opportunity</div>
+      <p>A single agent that ingests the available free data, reasons over it with real portfolio theory tuned to Pakistan, and stays on as a persistent monitor — doing the analytical work continuously while leaving every decision with the user.</p>
+    </div>
+  </section>
+
+  <!-- 2. VISION -->
+  <section id="vision">
+    <div class="sec-head"><span class="sec-num">02</span><h2>Product vision</h2></div>
+    <p class="lead">A conversational advisor that profiles you, proposes a portfolio, and then watches the market for you — like a diligent analyst who only ever recommends, and waits for your call.</p>
+    <p>The user talks to the agent in plain language. The agent profiles their risk, horizon, and capital; pulls candidate assets; runs portfolio optimization with diversification and risk constraints tuned to the local market; and returns a suggested allocation with a plain-language rationale. Once the user confirms what they actually invested, the agent shifts into a monitoring role: it tracks news against those exact holdings, scores each event for materiality, and flags only what genuinely changes the portfolio's risk or return. When something material hits, the user — not the agent — decides whether to re-optimize.</p>
+    <div class="callout gold">
+      <div class="lbl">North-star principle</div>
+      <p>Autonomous analysis, human-approved decisions. The agent does all the watching, matching, and computing on its own. It never moves money or rebalances without the user pressing the button.</p>
+    </div>
+  </section>
+
+  <!-- 3. USERS -->
+  <section id="users">
+    <div class="sec-head"><span class="sec-num">03</span><h2>Users &amp; modes</h2></div>
+    <p>The product serves two investor postures. The agent classifies which the user is during onboarding and adapts its logic, data cadence, and recommendations accordingly.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Dimension</th><th>Long-term investor</th><th>Short-term / active</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Horizon</strong></td><td>Months to years</td><td>Days to weeks (swing)</td></tr>
+          <tr><td><strong>Focus</strong></td><td>Diversification, dividends, fundamentals</td><td>Momentum, volatility, technicals on daily data</td></tr>
+          <tr><td><strong>Agent provides</strong></td><td>Asset allocation, rebalancing schedule, dividend tracking</td><td>Technical indicators, volatility ranking, position sizing</td></tr>
+          <tr><td><strong>Risk control</strong></td><td>Correlation-based weighting, sector limits</td><td>Stop-loss suggestions, max-drawdown limits</td></tr>
+          <tr><td><strong>Data cadence</strong></td><td>Daily EOD is sufficient</td><td>Daily EOD; intraday is out of free-data scope</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout rust">
+      <div class="lbl">Honest scoping note</div>
+      <p>True intraday day trading needs tick data that isn't freely available for PSX. "Active" mode is deliberately built on daily candles and framed as short-term/swing — an honest scope given the data, rather than implying live tick feeds the system doesn't have.</p>
+    </div>
+  </section>
+
+  <!-- 4. LIFECYCLE -->
+  <section id="lifecycle">
+    <div class="sec-head"><span class="sec-num">04</span><h2>The agent lifecycle</h2></div>
+    <p class="lead">The agent moves through three phases. This lifecycle is the product — each phase has distinct responsibilities and a distinct portfolio state.</p>
+    <div class="phases">
+      <div class="phase one">
+        <div class="pn">PHASE 01</div>
+        <h4>Onboarding</h4>
+        <p>User fills a form / chats. Agent profiles them, pulls candidate assets, runs optimization, and suggests a portfolio with rationale. State: <strong>draft</strong>.</p>
+      </div>
+      <div class="phase two">
+        <div class="pn">PHASE 02</div>
+        <h4>Activation</h4>
+        <p>User confirms what they actually invested (may differ from the suggestion). Agent locks the real holdings and begins tracking. State: <strong>confirmed</strong>.</p>
+      </div>
+      <div class="phase three">
+        <div class="pn">PHASE 03</div>
+        <h4>Monitoring</h4>
+        <p>Background jobs watch news and prices against confirmed holdings, score materiality, and flag. User triggers any re-optimization. State: <strong>tracked</strong>.</p>
+      </div>
+    </div>
+    <div class="callout">
+      <div class="lbl">Why state matters</div>
+      <p>The agent monitors the <em>confirmed</em> portfolio, not the suggestion. Users rarely buy exactly what's proposed, so the system must store actual positions as the source of truth for all tracking and performance.</p>
+    </div>
+  </section>
+
+  <!-- 5. MAIN FLOW -->
+  <section id="mainflow">
+    <div class="sec-head"><span class="sec-num">05</span><h2>End-to-end flow</h2></div>
+    <p>The full path from a new user to an actively monitored portfolio. Read top to bottom; the loop at the base is the continuous monitoring cycle.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 700" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="End-to-end flow from onboarding through monitoring loop">
+          <defs>
+            <marker id="ah" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#4a564f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+            <marker id="ahj" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#0f6e56" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+
+          <!-- Phase 1 band -->
+          <text class="svg-t" x="40" y="34" font-size="11" letter-spacing="1.5" fill="#7c867f">PHASE 01 — ONBOARDING</text>
+
+          <rect x="278" y="46" width="204" height="50" rx="9" fill="#e2e9ee" stroke="#2f4858" stroke-width="1"/>
+          <text class="svg-label" x="380" y="68" text-anchor="middle" font-size="15" fill="#2f4858" font-weight="600">User: form / chat</text>
+          <text class="svg-t" x="380" y="85" text-anchor="middle" font-size="11" fill="#4a564f">risk · horizon · capital</text>
+
+          <line x1="380" y1="96" x2="380" y2="124" stroke="#4a564f" stroke-width="1.4" marker-end="url(#ah)"/>
+
+          <rect x="278" y="124" width="204" height="50" rx="9" fill="#e2e9ee" stroke="#2f4858" stroke-width="1"/>
+          <text class="svg-label" x="380" y="146" text-anchor="middle" font-size="15" fill="#2f4858" font-weight="600">Agent profiles user</text>
+          <text class="svg-t" x="380" y="163" text-anchor="middle" font-size="11" fill="#4a564f">classify long-term / active</text>
+
+          <line x1="380" y1="174" x2="380" y2="202" stroke="#4a564f" stroke-width="1.4" marker-end="url(#ah)"/>
+
+          <rect x="278" y="202" width="204" height="50" rx="9" fill="#e2e9ee" stroke="#2f4858" stroke-width="1"/>
+          <text class="svg-label" x="380" y="224" text-anchor="middle" font-size="15" fill="#2f4858" font-weight="600">Optimize portfolio</text>
+          <text class="svg-t" x="380" y="241" text-anchor="middle" font-size="11" fill="#4a564f">MPT · SBP risk-free · limits</text>
+
+          <line x1="380" y1="252" x2="380" y2="280" stroke="#4a564f" stroke-width="1.4" marker-end="url(#ah)"/>
+
+          <rect x="278" y="280" width="204" height="50" rx="9" fill="#e2e9ee" stroke="#2f4858" stroke-width="1"/>
+          <text class="svg-label" x="380" y="302" text-anchor="middle" font-size="15" fill="#2f4858" font-weight="600">Suggest + explain</text>
+          <text class="svg-t" x="380" y="319" text-anchor="middle" font-size="11" fill="#4a564f">allocation · return · risk</text>
+
+          <!-- Phase 2 -->
+          <text class="svg-t" x="40" y="368" font-size="11" letter-spacing="1.5" fill="#7c867f">PHASE 02 — ACTIVATION</text>
+          <line x1="380" y1="330" x2="380" y2="388" stroke="#4a564f" stroke-width="1.4" marker-end="url(#ah)"/>
+
+          <rect x="278" y="388" width="204" height="52" rx="9" fill="#e1f1ea" stroke="#0f6e56" stroke-width="1.2"/>
+          <text class="svg-label" x="380" y="410" text-anchor="middle" font-size="15" fill="#0f6e56" font-weight="600">User confirms holdings</text>
+          <text class="svg-t" x="380" y="427" text-anchor="middle" font-size="11" fill="#0f6e56">actual positions locked</text>
+
+          <!-- Phase 3 -->
+          <text class="svg-t" x="40" y="478" font-size="11" letter-spacing="1.5" fill="#7c867f">PHASE 03 — MONITORING (loop)</text>
+          <line x1="380" y1="440" x2="380" y2="498" stroke="#0f6e56" stroke-width="1.4" marker-end="url(#ahj)"/>
+
+          <rect x="278" y="498" width="204" height="50" rx="9" fill="#ede4f2" stroke="#5a3d6b" stroke-width="1"/>
+          <text class="svg-label" x="380" y="520" text-anchor="middle" font-size="15" fill="#5a3d6b" font-weight="600">Watch news + prices</text>
+          <text class="svg-t" x="380" y="537" text-anchor="middle" font-size="11" fill="#5a3d6b">scheduled background jobs</text>
+
+          <line x1="380" y1="548" x2="380" y2="576" stroke="#4a564f" stroke-width="1.4" marker-end="url(#ah)"/>
+
+          <rect x="278" y="576" width="204" height="50" rx="9" fill="#f6ecd6" stroke="#b8801a" stroke-width="1"/>
+          <text class="svg-label" x="380" y="598" text-anchor="middle" font-size="15" fill="#b8801a" font-weight="600">Material event?</text>
+          <text class="svg-t" x="380" y="615" text-anchor="middle" font-size="11" fill="#8a6010">flag &amp; offer re-optimize</text>
+
+          <!-- loop back -->
+          <path d="M278 601 L150 601 L150 523 L276 523" fill="none" stroke="#5a3d6b" stroke-width="1.3" stroke-dasharray="5 4" marker-end="url(#ahj)"/>
+          <text class="svg-t" x="118" y="565" text-anchor="middle" font-size="10.5" fill="#5a3d6b">user acts,</text>
+          <text class="svg-t" x="118" y="579" text-anchor="middle" font-size="10.5" fill="#5a3d6b">loop continues</text>
+
+          <!-- re-optimize side path -->
+          <path d="M482 601 L610 601 L610 227 L484 227" fill="none" stroke="#b8801a" stroke-width="1.3" stroke-dasharray="5 4"/>
+          <circle cx="610" cy="601" r="3" fill="#b8801a"/>
+          <text class="svg-t" x="648" y="410" text-anchor="middle" font-size="10.5" fill="#8a6010">user triggers</text>
+          <text class="svg-t" x="648" y="424" text-anchor="middle" font-size="10.5" fill="#8a6010">re-optimization</text>
+        </svg>
+      </div>
+      <figcaption>Figure 1 · <b>End-to-end agent flow</b> — three phases, with the monitoring loop and the user-triggered re-optimization path</figcaption>
+    </figure>
+  </section>
+
+  <!-- 6. NEWS FLOW -->
+  <section id="newsflow">
+    <div class="sec-head"><span class="sec-num">06</span><h2>News &amp; materiality flow</h2></div>
+    <p>The monitoring engine's core logic. Raw news is noise; the agent's real job is filtering to what affects <em>this</em> user's holdings, then deciding whether it's actionable or merely informational.</p>
+
+    <figure>
+      <div class="fig-frame">
+        <svg viewBox="0 0 760 470" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="News ingestion to flag-or-log decision flow">
+          <defs>
+            <marker id="bh" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M2 1L8 5L2 9" fill="none" stroke="#4a564f" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+            </marker>
+          </defs>
+
+          <rect x="40" y="40" width="200" height="48" rx="9" fill="#fbeaf0" stroke="#993556" stroke-width="1"/>
+          <text class="svg-label" x="140" y="61" text-anchor="middle" font-size="14.5" fill="#993556" font-weight="600">Ingest news</text>
+          <text class="svg-t" x="140" y="78" text-anchor="middle" font-size="10.5" fill="#993556">PSX · SBP · Recorder · Dawn</text>
+
+          <line x1="240" y1="64" x2="294" y2="64" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+
+          <rect x="294" y="40" width="200" height="48" rx="9" fill="#ede4f2" stroke="#5a3d6b" stroke-width="1"/>
+          <text class="svg-label" x="394" y="61" text-anchor="middle" font-size="14.5" fill="#5a3d6b" font-weight="600">Match to holdings</text>
+          <text class="svg-t" x="394" y="78" text-anchor="middle" font-size="10.5" fill="#5a3d6b">ticker · sector · macro</text>
+
+          <line x1="494" y1="64" x2="548" y2="64" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+
+          <rect x="548" y="40" width="172" height="48" rx="9" fill="#ede4f2" stroke="#5a3d6b" stroke-width="1"/>
+          <text class="svg-label" x="634" y="61" text-anchor="middle" font-size="14.5" fill="#5a3d6b" font-weight="600">Relevant?</text>
+          <text class="svg-t" x="634" y="78" text-anchor="middle" font-size="10.5" fill="#5a3d6b">touches a holding</text>
+
+          <!-- not relevant drop -->
+          <path d="M634 88 L634 120 L300 120" fill="none" stroke="#7c867f" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#bh)"/>
+          <text class="svg-t" x="500" y="113" text-anchor="middle" font-size="10.5" fill="#7c867f">no → discard</text>
+
+          <line x1="634" y1="88" x2="634" y2="156" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+          <text class="svg-t" x="652" y="124" font-size="10.5" fill="#4a564f">yes</text>
+
+          <rect x="548" y="156" width="172" height="48" rx="9" fill="#faeeda" stroke="#b8801a" stroke-width="1"/>
+          <text class="svg-label" x="634" y="177" text-anchor="middle" font-size="14.5" fill="#b8801a" font-weight="600">Analyze impact</text>
+          <text class="svg-t" x="634" y="194" text-anchor="middle" font-size="10.5" fill="#8a6010">direction · magnitude</text>
+
+          <line x1="634" y1="204" x2="634" y2="240" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+
+          <rect x="548" y="240" width="172" height="48" rx="9" fill="#faeeda" stroke="#b8801a" stroke-width="1"/>
+          <text class="svg-label" x="634" y="261" text-anchor="middle" font-size="14.5" fill="#b8801a" font-weight="600">Materiality score</text>
+          <text class="svg-t" x="634" y="278" text-anchor="middle" font-size="10.5" fill="#8a6010">changes risk/return?</text>
+
+          <!-- branch material -->
+          <path d="M548 264 L420 264 L420 320" fill="none" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+          <text class="svg-t" x="455" y="256" font-size="10.5" fill="#a8401f">material</text>
+
+          <rect x="320" y="320" width="200" height="50" rx="9" fill="#f6e3da" stroke="#a8401f" stroke-width="1.2"/>
+          <text class="svg-label" x="420" y="342" text-anchor="middle" font-size="14.5" fill="#a8401f" font-weight="600">Flag to user</text>
+          <text class="svg-t" x="420" y="359" text-anchor="middle" font-size="10.5" fill="#a8401f">alert + impact rationale</text>
+
+          <!-- branch minor -->
+          <path d="M634 288 L634 345 L524 345" fill="none" stroke="#7c867f" stroke-width="1.2" stroke-dasharray="4 4" marker-end="url(#bh)"/>
+          <text class="svg-t" x="688" y="318" font-size="10.5" fill="#7c867f">minor</text>
+
+          <rect x="548" y="320" width="172" height="50" rx="9" fill="#f1efe8" stroke="#888780" stroke-width="1"/>
+          <text class="svg-label" x="634" y="342" text-anchor="middle" font-size="14.5" fill="#5f5e5a" font-weight="600">Log only</text>
+          <text class="svg-t" x="634" y="359" text-anchor="middle" font-size="10.5" fill="#5f5e5a">surface in feed</text>
+
+          <line x1="420" y1="370" x2="420" y2="406" stroke="#4a564f" stroke-width="1.4" marker-end="url(#bh)"/>
+          <rect x="300" y="406" width="240" height="46" rx="9" fill="#f6e3da" stroke="#a8401f" stroke-width="1"/>
+          <text class="svg-label" x="420" y="427" text-anchor="middle" font-size="14.5" fill="#a8401f" font-weight="600">User decides: re-optimize?</text>
+          <text class="svg-t" x="420" y="443" text-anchor="middle" font-size="10.5" fill="#a8401f">human-in-the-loop</text>
+        </svg>
+      </div>
+      <figcaption>Figure 2 · <b>News-to-flag pipeline</b> — relevance filter, impact analysis, materiality gate, and the human decision point</figcaption>
+    </figure>
+
+    <h3>Three levels of relevance</h3>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Level</th><th>Trigger</th><th>Example</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Direct</strong></td><td>News names a ticker the user holds</td><td>"HBL announces record profits" → user holds HBL</td></tr>
+          <tr><td><strong>Sector</strong></td><td>News affects a sector the user is exposed to</td><td>SBP raises rates → user holds bank stocks</td></tr>
+          <tr><td><strong>Macro</strong></td><td>Portfolio-wide effect</td><td>PKR depreciates 5% → affects everything</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout gold">
+      <div class="lbl">Fixed-income depth</div>
+      <p>For T-bills the agent encodes the inverse rate relationship: rates up → existing bond prices down, new issues yield more. An SBP rate cut prompts "your T-bills just appreciated"; a hike prompts "market value may dip, but reinvestment yield improves." Getting this relationship right is what makes the fixed-income guidance trustworthy.</p>
+    </div>
+  </section>
+
+  <!-- 7. DATA -->
+  <section id="data">
+    <div class="sec-head"><span class="sec-num">07</span><h2>Data layer</h2></div>
+    <p class="lead">Each asset class gets a refresh strategy matched to how fast it actually moves and how its data is available. This keeps the system within free-tier limits.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Asset class</th><th>Primary source</th><th>Fallback</th><th>Refresh</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Global stocks</strong></td><td>yfinance</td><td>—</td><td>Daily EOD</td></tr>
+          <tr><td><strong>PSX stocks</strong></td><td>yfinance <code>.KA</code></td><td>PSX DPS scrape</td><td>Daily EOD</td></tr>
+          <tr><td><strong>Crypto</strong></td><td>CoinGecko</td><td>cached value</td><td>30–60s cache</td></tr>
+          <tr><td><strong>T-bills</strong></td><td>SBP scrape</td><td>—</td><td>Event-driven</td></tr>
+          <tr><td><strong>Commodities</strong></td><td>yfinance + FRED</td><td>Alpha Vantage</td><td>Daily + on-demand news</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <div class="lbl">Key simplification</div>
+      <p>yfinance carries PSX stocks via the <code>.KA</code> suffix (NBP.KA, PSO.KA, HBL.KA…), so it drives global stocks, PSX stocks, <em>and</em> commodities through one adapter. PSX scraping is demoted to a targeted fallback for freshness checks, missing tickers, and dividends — far less fragile than a scrape-first pipeline.</p>
+    </div>
+    <h3>Refresh orchestration</h3>
+    <ul class="clean">
+      <li><strong>Daily (after close):</strong> yfinance EOD for stocks + commodities → recompute portfolio values + write a daily snapshot.</li>
+      <li><strong>Frequent / on-load:</strong> CoinGecko crypto, batched and cached 30–60s.</li>
+      <li><strong>Event-driven:</strong> T-bill scrape on new bond announcement or 3-month timer; rate-impact analysis on SBP rate news.</li>
+      <li><strong>On-demand:</strong> commodity news when the user asks; full portfolio refresh on request.</li>
+    </ul>
+  </section>
+
+  <!-- 8. LLM -->
+  <section id="llm">
+    <div class="sec-head"><span class="sec-num">08</span><h2>LLM routing</h2></div>
+    <p>The agent runs free-first, routing each call to the provider best suited for it. High-stakes data privacy is handled by keeping real financial PII out of free tiers.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Job</th><th>Provider / model</th><th>Why</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Reasoning &amp; analysis</strong></td><td>Gemini 2.5 Flash</td><td>1,500 req/day, 1M tokens/min — handles large news + portfolio context</td></tr>
+          <tr><td><strong>User-facing chat</strong></td><td>Groq (Llama 3.3 70B)</td><td>Fastest inference; low latency for conversation</td></tr>
+          <tr><td><strong>News sentiment (bulk)</strong></td><td>Gemini Flash-Lite / Groq 8B</td><td>Cheap, fast, high volume</td></tr>
+          <tr><td><strong>Rate-limit fallback</strong></td><td>OpenRouter free slot</td><td>Re-route when a primary provider caps out</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout rust">
+      <div class="lbl">Privacy guardrail</div>
+      <p>Gemini's free tier may use prompts for training. The agent reasons over <em>abstracted</em> data (ticker + weight, not real account IDs or balances) — consistent with the platform's privacy-by-architecture principle. Verify current free-tier quotas before building; providers change them often.</p>
+    </div>
+  </section>
+
+  <!-- 9. FEATURES -->
+  <section id="features">
+    <div class="sec-head"><span class="sec-num">09</span><h2>Feature requirements</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Feature</th><th>Requirement</th><th>Priority</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Onboarding profiler</strong></td><td>Chat/form captures risk, horizon, capital, constraints; classifies investor mode</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Portfolio optimizer</strong></td><td>MPT via PyPortfolioOpt, SBP rate as risk-free, sector concentration limits</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Suggestion + rationale</strong></td><td>Allocation chart, expected return/risk, plain-language justification</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Holdings confirmation</strong></td><td>User locks actual positions; portfolio moves to tracked state</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Performance dashboard</strong></td><td>Value, P&amp;L, per-class breakdown, time-series chart from daily snapshots</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Personalized news feed</strong></td><td>News filtered to holdings, tagged with impact direction</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Materiality flagging</strong></td><td>Background job scores events, alerts on material ones with rationale</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Re-optimization</strong></td><td>User-triggered; agent factors in the flagging reason</td><td><span class="pill p1">P0</span></td></tr>
+          <tr><td><strong>Rate-impact engine</strong></td><td>SBP rate news → T-bill yield/price recompute + explanation</td><td><span class="pill p2">P1</span></td></tr>
+          <tr><td><strong>Technical indicators</strong></td><td>RSI, MACD, MAs on daily data for active mode</td><td><span class="pill p2">P1</span></td></tr>
+          <tr><td><strong>Drift detection</strong></td><td>Flag when allocation drifts from target; suggest rebalance</td><td><span class="pill p3">P2</span></td></tr>
+          <tr><td><strong>Mutual funds (MUFAP)</strong></td><td>Include fund data — matches real retail behavior</td><td><span class="pill p3">P2</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 10. DECISIONS -->
+  <section id="decisions">
+    <div class="sec-head"><span class="sec-num">10</span><h2>Open decisions</h2></div>
+    <p>Four choices still shape the build. Recommendations noted, but these are owner calls.</p>
+    <div class="decisions">
+      <div class="decision">
+        <div class="q"><b>T-bill valuation depth</b><span>Proper bond pricing (discount future cash flows at current yield) vs. simplified directional impact.</span></div>
+        <div class="verdict">Lean simplified for MVP; proper pricing as a P1 upgrade.</div>
+      </div>
+      <div class="decision">
+        <div class="q"><b>Daily portfolio snapshots</b><span>Store a daily value snapshot per portfolio to power the performance-over-time chart.</span></div>
+        <div class="verdict">Yes — small effort now, enables the performance chart.</div>
+      </div>
+      <div class="decision">
+        <div class="q"><b>Single vs. multi-portfolio</b><span>One portfolio per user, or separate long-term and short-term portfolios.</span></div>
+        <div class="verdict">Single for MVP; multi adds state complexity.</div>
+      </div>
+      <div class="decision">
+        <div class="q"><b>Crypto weighting</b><span>Crypto is legal in Pakistan and popular with retail; the open question is how much weight it gets in the default universe, not whether to include it.</span></div>
+        <div class="verdict">Include by default; cap exposure via risk constraints.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 11. SCOPE -->
+  <section id="scope">
+    <div class="sec-head"><span class="sec-num">11</span><h2>MVP scope &amp; cuts</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>In scope</th><th>Out of scope (MVP)</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>Onboarding → suggested portfolio</td>
+            <td><span class="pill cut">cut</span> Live trade execution — show plan only</td>
+          </tr>
+          <tr>
+            <td>Confirm holdings → tracking</td>
+            <td><span class="pill cut">cut</span> Intraday / tick data</td>
+          </tr>
+          <tr>
+            <td>Daily news scrape → match → materiality flag</td>
+            <td><span class="pill cut">cut</span> Auto-rebalancing on news</td>
+          </tr>
+          <tr>
+            <td>Performance dashboard + snapshots</td>
+            <td><span class="pill cut">cut</span> Full PSX universe — start with liquid KSE-100 subset</td>
+          </tr>
+          <tr>
+            <td>Chat: portfolio + news-impact questions</td>
+            <td><span class="pill cut">cut</span> Multi-portfolio per user</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout">
+      <div class="lbl">Reference walkthrough</div>
+      <p>Fill form → get suggested portfolio → confirm → a material news event (e.g. an SBP rate decision) → agent flags it with impact analysis → user triggers re-optimize → agent shows the adjusted portfolio. This single loop exercises every core part of the product end to end.</p>
+    </div>
+    <div class="callout gold">
+      <div class="lbl">Why start with liquid names</div>
+      <p>Thinly-traded PSX stocks have gappy history → unstable covariance matrices → garbage optimization. Starting with the most liquid 30–50 KSE-100 names gives clean correlations, stable optimization, and reliable output. Quality over coverage.</p>
+    </div>
+  </section>
+
+  <!-- 12. RISKS -->
+  <section id="risks">
+    <div class="sec-head"><span class="sec-num">12</span><h2>Risks &amp; guardrails</h2></div>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Risk</th><th>Guardrail</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Scraping fragility</strong></td><td>Prefer structured/RSS sources (PSX announcements); yfinance-primary cuts scrape surface area</td></tr>
+          <tr><td><strong>Free-tier rate limits</strong></td><td>Aggressive caching, batched calls, per-class refresh cadence, OpenRouter fallback</td></tr>
+          <tr><td><strong>Data freshness (yfinance .KA)</strong></td><td>Freshness check; fall back to PSX DPS for the current close when stale</td></tr>
+          <tr><td><strong>Financial-advice liability</strong></td><td>Frame outputs as "suggested allocation based on MPT," with disclaimers; agent never auto-acts</td></tr>
+          <tr><td><strong>Local price accuracy (gold)</strong></td><td>International price ≠ local PKR price; scrape local rate or convert via PKR/USD FX</td></tr>
+          <tr><td><strong>LLM prompt privacy</strong></td><td>Reason over abstracted data; keep real PII out of free tiers</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout rust">
+      <div class="lbl">Non-negotiable</div>
+      <p>The agent suggests; the user decides. No automatic rebalancing, no trade execution without explicit confirmation. This is both a trust requirement and a compliance one.</p>
+    </div>
+  </section>
+
+</div>
+
+<footer>
+  <div class="wrap" style="display:flex;justify-content:space-between;width:100%;flex-wrap:wrap;gap:12px;">
+    <span>PRD v1.0 · Agentic Wealth Management Platform</span>
+    <span>Pakistan market · MVP scope</span>
+    <span>Autonomous analysis, human-approved decisions</span>
+  </div>
+</footer>
+
+</body>
+</html>

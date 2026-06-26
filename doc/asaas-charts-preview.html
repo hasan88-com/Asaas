@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asaas — Charts</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F4ED;--card:#FFFEFB;--ink:#16201C;--ink-soft:#4A564F;--ink-faint:#7C867F;
+    --line:#DCD8CC;--line-soft:#E8E4D9;--jade:#0F6E56;--jade-soft:#E1F1EA;--gold:#B8801A;
+    --ac-stock:#0F6E56;--ac-crypto:#5A3D6B;--ac-tbill:#2F4858;--ac-commodity:#B8801A;--ac-fund:#3E7C8C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:"Inter",sans-serif;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:880px;margin:0 auto;padding:48px 28px 80px;}
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--jade);}
+  h2.sec{font-family:"Fraunces",serif;font-size:24px;font-weight:600;margin:6px 0 4px;}
+  .sec-sub{font-size:14px;color:var(--ink-faint);margin-bottom:22px;}
+  .grid{display:grid;grid-template-columns:1fr 1.3fr;gap:20px;align-items:start;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:24px;box-shadow:0 4px 16px rgba(22,32,28,.06);}
+  .card .eyebrow{margin-bottom:16px;display:block;}
+  .legend{margin-top:18px;display:flex;flex-direction:column;gap:9px;}
+  .leg{display:flex;align-items:center;gap:9px;font-family:"IBM Plex Mono",monospace;font-size:12.5px;font-variant-numeric:tabular-nums;}
+  .leg .dot{width:10px;height:10px;border-radius:3px;flex-shrink:0;}
+  .leg .nm{flex:1;color:var(--ink-soft);}
+  .leg .pct{font-weight:600;}
+  .donut-center{font-family:"Fraunces",serif;}
+  @media(max-width:680px){.grid{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="eyebrow">Design system · charts</div>
+  <h2 class="sec">Allocation &amp; performance</h2>
+  <p class="sec-sub">Asset-class accent colors on the donut; jade line with soft fill for performance. Mono axis labels, hairline gridlines.</p>
+
+  <div class="grid">
+    <div class="card">
+      <span class="eyebrow">Allocation</span>
+      <div style="position:relative;height:200px;">
+        <canvas id="donut"></canvas>
+        <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);">Total</div>
+          <div class="donut-center" style="font-size:22px;font-weight:600;">₨1.28M</div>
+        </div>
+      </div>
+      <div class="legend">
+        <div class="leg"><span class="dot" style="background:var(--ac-stock)"></span><span class="nm">Stocks</span><span class="pct">32%</span></div>
+        <div class="leg"><span class="dot" style="background:var(--ac-tbill)"></span><span class="nm">T-bills</span><span class="pct">25%</span></div>
+        <div class="leg"><span class="dot" style="background:var(--ac-commodity)"></span><span class="nm">Commodities</span><span class="pct">20%</span></div>
+        <div class="leg"><span class="dot" style="background:var(--ac-crypto)"></span><span class="nm">Crypto</span><span class="pct">13%</span></div>
+        <div class="leg"><span class="dot" style="background:var(--ac-fund)"></span><span class="nm">Funds</span><span class="pct">10%</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <span class="eyebrow">Performance · 6 months</span>
+      <div style="height:300px;position:relative;">
+        <canvas id="line"></canvas>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+  const jade='#0F6E56', jadeSoft='rgba(15,110,86,0.10)', faint='#7C867F', line='#DCD8CC';
+  const mono="'IBM Plex Mono', monospace";
+
+  new Chart(document.getElementById('donut'), {
+    type:'doughnut',
+    data:{labels:['Stocks','T-bills','Commodities','Crypto','Funds'],
+      datasets:[{data:[32,25,20,13,10],
+        backgroundColor:['#0F6E56','#2F4858','#B8801A','#5A3D6B','#3E7C8C'],
+        borderColor:'#FFFEFB',borderWidth:3}]},
+    options:{cutout:'68%',plugins:{legend:{display:false},tooltip:{enabled:false}},
+      responsive:true,maintainAspectRatio:false}
+  });
+
+  new Chart(document.getElementById('line'), {
+    type:'line',
+    data:{labels:['Jan','Feb','Mar','Apr','May','Jun'],
+      datasets:[{data:[1000,1040,1025,1110,1180,1284],
+        borderColor:jade,backgroundColor:jadeSoft,borderWidth:2.5,
+        fill:true,tension:0.35,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:jade}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{
+        backgroundColor:'#16201C',titleFont:{family:mono,size:11},bodyFont:{family:mono,size:12},
+        padding:10,displayColors:false,callbacks:{label:c=>'₨ '+c.parsed.y.toLocaleString()+'K'}}},
+      scales:{
+        y:{grid:{color:line,drawBorder:false},ticks:{font:{family:mono,size:11},color:faint,
+          callback:v=>'₨'+v+'K'}},
+        x:{grid:{display:false},ticks:{font:{family:mono,size:11},color:faint}}}}
+  });
+</script>
+</body>
+</html>

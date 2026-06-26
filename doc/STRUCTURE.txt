@@ -1,0 +1,126 @@
+================================================================================
+                          ASAAS (اثاثہ)  —  FILE STRUCTURE
+              Agentic Wealth Management Platform · Pakistan Market
+================================================================================
+
+asaas/
+|
++-- README.md                         # entry point: what Asaas is, how to run
++-- .gitignore
++-- .env.example                      # all API keys (empty): Gemini, Groq,
+|                                     #   Cerebras, OpenRouter, CoinGecko,
+|                                     #   FRED, Alpha Vantage
++-- RULES.md                          # (root) coder guardrails + phased plan
++-- BUILD_LOG.md                      # (root) running build log, kept current
+|
++-- docs/                             # SPEC FILES (source of truth)
+|   +-- PRD.md                        # problem, users, features, success criteria
+|   +-- TECH.md                       # tech requirements + DB schema + LLM routing
+|   +-- AGENT_RULES.md                # per-role rules + LangGraph orchestration
+|   +-- DESIGN.md                     # visual system + charts spec
+|   +-- FLOW.md                       # user flows incl. guest mode
+|   +-- previews/
+|       +-- asaas-design-preview.html
+|       +-- asaas-charts-preview.html
+|
++-- backend/                          # FastAPI app (RULES.md Phases 0-4)
+|   +-- app/
+|   |   +-- main.py                   # FastAPI entry, routers, middleware
+|   |   +-- core/
+|   |   |   +-- config.py             # env, settings
+|   |   |   +-- security.py           # JWT, bcrypt
+|   |   |   +-- db.py                 # async session, engine
+|   |   +-- models/                   # SQLAlchemy ORM (TECH.md section 7)
+|   |   |   +-- user.py
+|   |   |   +-- risk_profile.py
+|   |   |   +-- instrument.py
+|   |   |   +-- price.py
+|   |   |   +-- portfolio.py
+|   |   |   +-- holding.py
+|   |   |   +-- snapshot.py
+|   |   |   +-- news.py
+|   |   |   +-- flag.py
+|   |   |   +-- chat_message.py
+|   |   +-- schemas/                  # Pydantic request/response models
+|   |   +-- api/
+|   |   |   +-- auth.py               # register, login, refresh
+|   |   |   +-- profile.py            # risk profile CRUD
+|   |   |   +-- portfolio.py          # suggest, confirm, reoptimize, analyze-guest
+|   |   |   +-- market.py             # prices, performance, search
+|   |   |   +-- analysis.py           # on-demand valuation + technical endpoints
+|   |   |   +-- news.py               # feed, flags
+|   |   |   +-- chat.py               # agent chat (SSE streaming)
+|   |   +-- agent/
+|   |   |   +-- orchestrator.py       # LangGraph graph: intent -> role routing
+|   |   |   +-- llm_router.py         # Gemini Flash/Pro, Groq, Cerebras, OpenRouter
+|   |   |   +-- roles/                # one module per role (AGENT_RULES.md)
+|   |   |   |   +-- profiler.py
+|   |   |   |   +-- optimizer.py
+|   |   |   |   +-- news_materiality.py
+|   |   |   |   +-- rate_impact.py
+|   |   |   |   +-- valuation.py        # DCF + Monte Carlo + multiples (on-demand)
+|   |   |   |   +-- technical.py        # RSI, MACD, MFI, golden cross, etc. (on-demand)
+|   |   |   |   +-- chat.py
+|   |   |   +-- tools/                # agent tools (TECH.md section 5)
+|   |   |   +-- prompts/              # system prompts + abstraction rules
+|   |   +-- data/
+|   |   |   +-- adapters/             # yfinance, coingecko, sbp, fred, alpha_vantage
+|   |   |   +-- news/                 # source scrapers + normalizer
+|   |   |   +-- cache.py              # Redis read-through + rate-limit (guest cookie/IP)
+|   |   +-- services/
+|   |   |   +-- optimizer.py          # PyPortfolioOpt, SBP risk-free, sector caps
+|   |   |   +-- valuation.py          # DCF, WACC (SBP), Monte Carlo, multiples
+|   |   |   +-- technical.py          # indicator computations on daily EOD
+|   |   |   +-- materiality.py        # news -> score -> flag/log
+|   |   |   +-- rate_impact.py        # SBP rate -> T-bill yield/price
+|   |   |   +-- performance.py        # value calc, snapshots, drift
+|   |   +-- workers/
+|   |       +-- daily_eod.py          # stocks + commodities + snapshot
+|   |       +-- crypto_refresh.py     # batched coin prices
+|   |       +-- tbill_watch.py        # event-driven SBP scrape
+|   |       +-- news_monitor.py       # ingest -> match -> score -> flag
+|   +-- tests/                        # pytest (RULES.md Part C security + Part D)
+|   +-- migrations/                   # DB migrations (schema from TECH.md section 7)
+|   +-- requirements.txt
+|   +-- .env.example
+|
++-- frontend/                         # React + Vite (RULES.md Phase 5)
+    +-- src/
+    |   +-- pages/
+    |   |   +-- Landing.tsx
+    |   |   +-- GuestAnalyze.tsx      # no-login try-it (cookie-limited)
+    |   |   +-- Onboarding.tsx
+    |   |   +-- Suggestion.tsx
+    |   |   +-- Dashboard.tsx
+    |   |   +-- Chat.tsx
+    |   |   +-- News.tsx
+    |   |   +-- Flags.tsx
+    |   +-- components/
+    |   |   +-- ui/                   # shadcn/ui restyled to DESIGN.md tokens
+    |   |   +-- charts/               # donut + performance line (DESIGN.md 5b)
+    |   +-- lib/
+    |   |   +-- api.ts                # API client
+    |   |   +-- guestSession.ts       # guest state + cookie handling (FLOW.md 2)
+    |   +-- styles/
+    +-- tailwind.config.js            # Asaas tokens (DESIGN.md section 9)
+    +-- index.html
+    +-- package.json
+    +-- .env.example
+
+================================================================================
+ DOC -> BUILDS
+--------------------------------------------------------------------------------
+ PRD.md          -> product purpose + success criteria
+ TECH.md         -> backend structure, models (schema), api, llm_router
+ AGENT_RULES.md  -> agent/orchestrator.py (LangGraph) + agent/roles/
+ RULES.md        -> build order (Phases 0-5), tests/, what's allowed
+ DESIGN.md       -> frontend components, charts, tailwind.config.js
+ FLOW.md         -> frontend/pages + guest flow + cookie handling
+ BUILD_LOG.md    -> updated continuously as files get created
+================================================================================
+ API KEYS REQUIRED (all free, no card)
+--------------------------------------------------------------------------------
+ REQUIRED : Gemini, Groq, CoinGecko, FRED, Alpha Vantage
+ OPTIONAL : Cerebras (faster chat), OpenRouter (fallback - recommended)
+ NO KEY   : yfinance (library), SBP scrape, news scrapes
+================================================================================

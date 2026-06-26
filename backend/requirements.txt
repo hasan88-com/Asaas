@@ -1,0 +1,64 @@
+# =============================================================================
+# ASAAS Backend — Dependencies
+# Versions unpinned where Python 3.14 wheels require newer releases.
+# =============================================================================
+
+# --- Framework ---
+fastapi>=0.115.12
+uvicorn[standard]>=0.34.3
+python-multipart>=0.0.20
+
+# --- Database ---
+sqlalchemy[asyncio]>=2.0.41
+asyncpg>=0.30.0
+alembic>=1.15.2
+greenlet>=3.2.3
+
+# --- Validation ---
+pydantic>=2.11.4
+pydantic-settings>=2.9.1
+email-validator>=2.2.0
+
+# --- Auth ---
+python-jose[cryptography]>=3.4.0
+cryptography>=42.0.0  # required for EC (ES256) JWKS verification
+supabase>=2.15.2
+
+# --- Redis ---
+redis[hiredis]>=6.2.0
+
+# --- HTTP ---
+httpx>=0.28.1
+aiohttp>=3.12.6
+
+# --- LLM / Agent ---
+langgraph>=0.4.8
+
+# Direct provider SDKs — no LangChain
+groq>=0.9.0
+google-generativeai>=0.7.0
+openai>=1.40.0
+
+# --- Data ---
+yfinance>=0.2.62
+psx-data-reader>=0.0.6  # PSX daily OHLCV history (backfill); pure-Python, no C compiler
+# pyportfolioopt removed: cvxpy→ecos requires a C compiler; optimizer uses numpy/scipy instead
+
+# --- Scraping ---
+beautifulsoup4>=4.13.4
+lxml>=5.4.0
+playwright>=1.52.0
+
+# --- Scheduling ---
+apscheduler>=3.11.0
+
+# --- Utilities ---
+python-dotenv>=1.1.0
+numpy>=2.1.0
+pandas>=2.2.0
+scipy>=1.13.0
+python-dateutil>=2.9.0
+
+# --- Testing ---
+pytest>=8.4.0
+pytest-asyncio>=0.23.0

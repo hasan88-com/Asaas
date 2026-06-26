@@ -1,0 +1,207 @@
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { AssetComboBox } from '@/components/ui/combobox'
+import { ASSET_UNIVERSE, type AssetCategory } from '@/data/assetUniverse'
+import { addHolding, sellHolding, updateHolding } from '@/lib/api'
+import { cn } from '@/lib/utils'
+import type { HoldingResponse } from '@/types/api'
+
+type Panel = 'buy' | 'sell' | 'update' | null
+
+const CAT_FILTER: Record<AssetCategory, readonly string[]> = {
+  stock: ['equity'],
+  bond: ['tbill', 'bond'],
+  crypto: ['crypto'],
+  commodity: ['commodity'],
+}
+
+const CAT_LABEL: Record<AssetCategory, string> = {
+  stock: 'Equity', bond: 'Bond / T-Bill', crypto: 'Crypto', commodity: 'Commodity',
+}
+
+const inputCls = cn(
+  'bg-card border border-line rounded-[6px] px-2 py-2 text-[13px] font-mono tabular-nums text-ink w-full',
+  'min-h-[40px] focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2',
+)
+const labelCls = 'font-sans text-[11px] font-medium text-ink mb-1 block'
+
+export function MyActivity({
+  holdings,
+  onChanged,
+}: {
+  holdings: HoldingResponse[]
+  onChanged: () => void | Promise<void>
+}) {
+  const [panel, setPanel] = useState<Panel>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // buy
+  const [buyCat, setBuyCat] = useState<AssetCategory>('stock')
+  const [buySymbol, setBuySymbol] = useState('')
+  const [buyQty, setBuyQty] = useState('')
+  const [buyPrice, setBuyPrice] = useState('')
+  const [buyDate, setBuyDate] = useState('')
+  // sell
+  const [sellId, setSellId] = useState('')
+  const [sellQty, setSellQty] = useState('')
+  const [sellPrice, setSellPrice] = useState('')
+  const [sellDate, setSellDate] = useState('')
+  // update
+  const [updId, setUpdId] = useState('')
+  const [updPrice, setUpdPrice] = useState('')
+
+  const openPanel = (p: Panel) => { setError(null); setPanel(panel === p ? null : p) }
+  const close = () => { setPanel(null); setError(null); setSubmitting(false) }
+
+  async function run(fn: () => Promise<unknown>) {
+    setSubmitting(true)
+    setError(null)
+    try {
+      await fn()
+      await onChanged()
+      close()
+    } catch (e) {
+      const s = (e as { status?: number }).status
+      setError(s === 422 ? 'Insufficient holdings.' : (e instanceof Error ? e.message : 'Something went wrong.'))
+      setSubmitting(false)
+    }
+  }
+
+  const sellable = holdings.filter((h) => h.id && (h.quantity ?? 0) > 0)
+  const holdingLabel = (h: HoldingResponse) =>
+    `${h.symbol ?? h.name ?? '—'}${h.quantity != null ? ` · ${h.quantity} units` : ''}`
+
+  const buyValid = !!buySymbol.trim() && parseFloat(buyQty) > 0 && parseFloat(buyPrice) >= 0
+  const sellValid = !!sellId && parseFloat(sellQty) > 0 && parseFloat(sellPrice) >= 0
+  const updValid = !!updId && parseFloat(updPrice) >= 0
+
+  return (
+    <section className="bg-card border border-line rounded-[12px] p-5 flex flex-col gap-4">
+      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">My Activity</p>
+
+      <div className="flex flex-wrap gap-2">
+        <Button variant={panel === 'buy' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('buy')}>I bought</Button>
+        <Button variant={panel === 'sell' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('sell')}>I sold</Button>
+        <Button variant={panel === 'update' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('update')}>Update price</Button>
+      </div>
+
+      {/* I bought */}
+      {panel === 'buy' && (
+        <div className="border border-line rounded-[10px] p-4 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-2">
+            {(Object.keys(CAT_FILTER) as AssetCategory[]).map((c) => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => { setBuyCat(c); setBuySymbol('') }}
+                className={cn(
+                  'px-2.5 py-1 rounded-full text-[11px] font-mono border transition-colors',
+                  buyCat === c ? 'bg-jade-soft border-jade text-jade' : 'border-line text-ink-soft hover:text-ink',
+                )}
+              >
+                {CAT_LABEL[c]}
+              </button>
+            ))}
+          </div>
+          <div>
+            <label className={labelCls}>Symbol</label>
+            <AssetComboBox
+              category={buyCat}
+              options={ASSET_UNIVERSE[buyCat]}
+              value={buySymbol}
+              onChange={setBuySymbol}
+              placeholder="Search…"
+              assetClass={CAT_FILTER[buyCat]}
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <div><label className={labelCls}>Quantity</label>
+              <input className={inputCls} type="number" inputMode="decimal" placeholder="0" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} /></div>
+            <div><label className={labelCls}>Price paid (₨)</label>
+              <input className={inputCls} type="number" inputMode="decimal" placeholder="0.00" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} /></div>
+            <div><label className={labelCls}>Date</label>
+              <input className={inputCls} type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></div>
+          </div>
+          <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() =>
+            run(() => addHolding({ symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined }))
+          } />
+        </div>
+      )}
+
+      {/* I sold */}
+      {panel === 'sell' && (
+        <div className="border border-line rounded-[10px] p-4 flex flex-col gap-3">
+          {sellable.length === 0 ? (
+            <p className="font-sans text-[13px] text-ink-faint">No holdings to sell.</p>
+          ) : (
+            <>
+              <div>
+                <label className={labelCls}>Holding</label>
+                <select className={inputCls} value={sellId} onChange={(e) => setSellId(e.target.value)}>
+                  <option value="">Select a holding…</option>
+                  {sellable.map((h) => <option key={h.id} value={h.id}>{holdingLabel(h)}</option>)}
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div><label className={labelCls}>Qty sold</label>
+                  <input className={inputCls} type="number" inputMode="decimal" placeholder="0" value={sellQty} onChange={(e) => setSellQty(e.target.value)} /></div>
+                <div><label className={labelCls}>Price (₨)</label>
+                  <input className={inputCls} type="number" inputMode="decimal" placeholder="0.00" value={sellPrice} onChange={(e) => setSellPrice(e.target.value)} /></div>
+                <div><label className={labelCls}>Date</label>
+                  <input className={inputCls} type="date" value={sellDate} onChange={(e) => setSellDate(e.target.value)} /></div>
+              </div>
+              <ActivityFooter error={error} submitting={submitting} disabled={!sellValid} onCancel={close} onSubmit={() =>
+                run(() => sellHolding({ holding_id: sellId, quantity: sellQty, price: sellPrice, date: sellDate || undefined }))
+              } />
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Update price */}
+      {panel === 'update' && (
+        <div className="border border-line rounded-[10px] p-4 flex flex-col gap-3">
+          {holdings.length === 0 ? (
+            <p className="font-sans text-[13px] text-ink-faint">No holdings to update.</p>
+          ) : (
+            <>
+              <div>
+                <label className={labelCls}>Holding</label>
+                <select className={inputCls} value={updId} onChange={(e) => setUpdId(e.target.value)}>
+                  <option value="">Select a holding…</option>
+                  {holdings.filter((h) => h.id).map((h) => <option key={h.id} value={h.id}>{holdingLabel(h)}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={labelCls}>New entry price (₨)</label>
+                <input className={inputCls} type="number" inputMode="decimal" placeholder="0.00" value={updPrice} onChange={(e) => setUpdPrice(e.target.value)} />
+              </div>
+              <ActivityFooter error={error} submitting={submitting} disabled={!updValid} onCancel={close} onSubmit={() =>
+                run(() => updateHolding(updId, { entry_price: updPrice }))
+              } />
+            </>
+          )}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function ActivityFooter({
+  error, submitting, disabled, onCancel, onSubmit,
+}: {
+  error: string | null; submitting: boolean; disabled: boolean; onCancel: () => void; onSubmit: () => void
+}) {
+  return (
+    <>
+      {error && <p className="font-sans text-[12px] text-loss" role="alert">{error}</p>}
+      <div className="flex gap-2 justify-end">
+        <Button variant="ghost" size="sm" onClick={onCancel} disabled={submitting}>Cancel</Button>
+        <Button variant="primary" size="sm" onClick={onSubmit} disabled={disabled || submitting}>
+          {submitting ? 'Saving…' : 'Save'}
+        </Button>
+      </div>
+    </>
+  )
+}

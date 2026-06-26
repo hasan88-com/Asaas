@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asaas — Design System Preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --paper:#F6F4ED;--card:#FFFEFB;--ink:#16201C;--ink-soft:#4A564F;--ink-faint:#7C867F;
+    --line:#DCD8CC;--line-soft:#E8E4D9;--jade:#0F6E56;--jade-soft:#E1F1EA;
+    --gold:#B8801A;--gold-soft:#F6ECD6;--gain:#0F6E56;--loss:#A8401F;--loss-soft:#F6E3DA;
+    --info:#2F4858;--info-soft:#E2E9EE;
+    --ac-stock:#0F6E56;--ac-crypto:#5A3D6B;--ac-tbill:#2F4858;--ac-commodity:#B8801A;--ac-fund:#3E7C8C;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--paper);color:var(--ink);font-family:"Inter",system-ui,sans-serif;line-height:1.6;-webkit-font-smoothing:antialiased;}
+  .wrap{max-width:880px;margin:0 auto;padding:56px 28px 100px;}
+  .mono{font-family:"IBM Plex Mono",monospace;}
+  .serif{font-family:"Fraunces",Georgia,serif;}
+  .tnum{font-variant-numeric:tabular-nums;}
+
+  .eyebrow{font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.18em;text-transform:uppercase;font-weight:600;color:var(--jade);}
+  h1.brand{font-family:"Fraunces",serif;font-size:64px;font-weight:600;letter-spacing:-.02em;line-height:1;margin:14px 0 6px;}
+  .brand-urdu{font-size:28px;color:var(--ink-soft);margin-bottom:10px;}
+  .tagline{font-size:18px;color:var(--ink-soft);font-style:italic;max-width:48ch;}
+
+  section{margin-top:56px;}
+  h2.sec{font-family:"Fraunces",serif;font-size:24px;font-weight:600;margin-bottom:4px;}
+  .sec-sub{font-size:14px;color:var(--ink-faint);margin-bottom:22px;}
+
+  /* swatches */
+  .swatches{display:grid;grid-template-columns:repeat(auto-fit,minmax(132px,1fr));gap:12px;}
+  .sw{border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--card);}
+  .sw .chip{height:64px;}
+  .sw .meta{padding:9px 11px;}
+  .sw .nm{font-size:12.5px;font-weight:500;}
+  .sw .hx{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);}
+
+  /* type rows */
+  .type-row{border-top:1px solid var(--line-soft);padding:16px 0;display:flex;align-items:baseline;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+  .type-row:first-of-type{border-top:none;}
+  .type-label{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);letter-spacing:.05em;flex-shrink:0;}
+
+  /* dashboard mock */
+  .dash{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:26px;box-shadow:0 4px 16px rgba(22,32,28,.06);}
+  .value-hero{display:flex;align-items:baseline;gap:12px;}
+  .value-hero .amt{font-family:"Fraunces",serif;font-size:48px;font-weight:600;letter-spacing:-.01em;}
+  .value-hero .cur{font-family:"IBM Plex Mono",monospace;font-size:14px;color:var(--ink-faint);}
+  .pnl{font-family:"IBM Plex Mono",monospace;font-size:15px;color:var(--gain);margin-top:4px;font-weight:500;}
+  .holdings{margin-top:22px;width:100%;border-collapse:collapse;}
+  .holdings th{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);text-align:left;padding:8px 0;border-bottom:1.5px solid var(--line);font-weight:600;}
+  .holdings td{padding:11px 0;border-bottom:1px solid var(--line-soft);font-family:"IBM Plex Mono",monospace;font-size:13.5px;font-variant-numeric:tabular-nums;}
+  .holdings td.name{font-family:"Inter",sans-serif;display:flex;align-items:center;gap:9px;}
+  .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .num{text-align:right;}
+  .up{color:var(--gain);}.down{color:var(--loss);}
+
+  /* buttons */
+  .btns{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+  .btn{font-family:"Inter",sans-serif;font-size:14.5px;font-weight:500;padding:10px 18px;border-radius:10px;border:1px solid transparent;cursor:pointer;}
+  .btn-primary{background:var(--jade);color:#fff;}
+  .btn-secondary{background:var(--card);color:var(--ink);border-color:var(--line);}
+  .btn-ghost{background:transparent;color:var(--ink-soft);}
+  .btn-danger{background:var(--loss);color:#fff;}
+
+  /* flag */
+  .flag{border-left:3px solid var(--loss);background:var(--loss-soft);border-radius:0 10px 10px 0;padding:16px 20px;margin-top:14px;}
+  .flag.med{border-left-color:var(--gold);background:var(--gold-soft);}
+  .flag .ft{font-size:15px;font-weight:600;margin-bottom:4px;}
+  .flag .fb{font-size:13.5px;color:var(--ink-soft);}
+  .flag .fa{margin-top:12px;}
+
+  /* chips */
+  .chips{display:flex;gap:9px;flex-wrap:wrap;}
+  .chip-tag{font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;padding:3px 11px;border-radius:6px;}
+
+  /* news row */
+  .news{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-top:10px;display:flex;align-items:center;gap:14px;}
+  .news .src{font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-faint);background:var(--paper);padding:3px 8px;border-radius:5px;flex-shrink:0;}
+  .news .hl{font-size:14px;flex:1;}
+  .news .impact{font-family:"IBM Plex Mono",monospace;font-size:13px;font-weight:600;flex-shrink:0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Design system · v1.0</div>
+  <h1 class="brand">Asaas</h1>
+  <div class="brand-urdu serif">اثاثہ</div>
+  <p class="tagline">A warm, paper-toned, editorial wealth interface — calm, grounded, trustworthy.</p>
+
+  <section>
+    <h2 class="sec">Color</h2>
+    <p class="sec-sub">Jade and gold on warm paper. Green is up, rust is down — never inverted.</p>
+    <div class="swatches">
+      <div class="sw"><div class="chip" style="background:#0F6E56"></div><div class="meta"><div class="nm">Jade · brand</div><div class="hx">#0F6E56</div></div></div>
+      <div class="sw"><div class="chip" style="background:#B8801A"></div><div class="meta"><div class="nm">Gold · accent</div><div class="hx">#B8801A</div></div></div>
+      <div class="sw"><div class="chip" style="background:#16201C"></div><div class="meta"><div class="nm">Ink · text</div><div class="hx">#16201C</div></div></div>
+      <div class="sw"><div class="chip" style="background:#A8401F"></div><div class="meta"><div class="nm">Rust · loss</div><div class="hx">#A8401F</div></div></div>
+      <div class="sw"><div class="chip" style="background:#2F4858"></div><div class="meta"><div class="nm">Slate · info</div><div class="hx">#2F4858</div></div></div>
+      <div class="sw"><div class="chip" style="background:#F6F4ED;border-bottom:1px solid var(--line)"></div><div class="meta"><div class="nm">Paper · bg</div><div class="hx">#F6F4ED</div></div></div>
+    </div>
+    <p class="sec-sub" style="margin-top:18px;">Asset-class accents</p>
+    <div class="chips">
+      <span class="chip-tag" style="background:var(--jade-soft);color:var(--ac-stock)">● Stocks</span>
+      <span class="chip-tag" style="background:#ede4f2;color:var(--ac-crypto)">● Crypto</span>
+      <span class="chip-tag" style="background:var(--info-soft);color:var(--ac-tbill)">● T-bills</span>
+      <span class="chip-tag" style="background:var(--gold-soft);color:var(--ac-commodity)">● Commodities</span>
+      <span class="chip-tag" style="background:#e0eef1;color:var(--ac-fund)">● Funds</span>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">Typography</h2>
+    <p class="sec-sub">Fraunces (display) · Inter (body) · IBM Plex Mono (data).</p>
+    <div class="type-row"><span class="serif" style="font-size:42px;font-weight:600;">₨ 1,250,000</span><span class="type-label">display · Fraunces 600</span></div>
+    <div class="type-row"><span class="serif" style="font-size:24px;font-weight:600;">Your suggested portfolio</span><span class="type-label">heading · Fraunces 600</span></div>
+    <div class="type-row"><span style="font-size:16px;">A diversified allocation tuned to your risk profile and the local market.</span><span class="type-label">body · Inter 400</span></div>
+    <div class="type-row"><span class="mono tnum" style="font-size:16px;font-weight:500;">HBL.KA  +2.4%  ₨ 142.50</span><span class="type-label">data · Plex Mono 500</span></div>
+    <div class="type-row"><span class="eyebrow">Portfolio value</span><span class="type-label">eyebrow · Plex Mono 600</span></div>
+  </section>
+
+  <section>
+    <h2 class="sec">Dashboard</h2>
+    <p class="sec-sub">Portfolio value is the hero. Numbers in tabular mono, value in serif.</p>
+    <div class="dash">
+      <div class="eyebrow">Total portfolio value</div>
+      <div class="value-hero" style="margin-top:8px;">
+        <span class="amt tnum">₨ 1,284,500</span>
+        <span class="cur">PKR</span>
+      </div>
+      <div class="pnl tnum">▲ +₨ 34,500 · +2.76%</div>
+
+      <table class="holdings">
+        <thead><tr><th>Holding</th><th class="num">Weight</th><th class="num">Price</th><th class="num">Day</th></tr></thead>
+        <tbody>
+          <tr><td class="name"><span class="dot" style="background:var(--ac-stock)"></span>HBL.KA</td><td class="num tnum">18%</td><td class="num tnum">142.50</td><td class="num tnum up">+2.4%</td></tr>
+          <tr><td class="name"><span class="dot" style="background:var(--ac-stock)"></span>OGDC.KA</td><td class="num tnum">14%</td><td class="num tnum">98.20</td><td class="num tnum down">−0.8%</td></tr>
+          <tr><td class="name"><span class="dot" style="background:var(--ac-tbill)"></span>T-bill 3M</td><td class="num tnum">25%</td><td class="num tnum">—</td><td class="num tnum">+0.1%</td></tr>
+          <tr><td class="name"><span class="dot" style="background:var(--ac-commodity)"></span>Gold</td><td class="num tnum">12%</td><td class="num tnum">216,400</td><td class="num tnum up">+0.9%</td></tr>
+          <tr><td class="name"><span class="dot" style="background:var(--ac-crypto)"></span>BTC</td><td class="num tnum">8%</td><td class="num tnum">—</td><td class="num tnum up">+3.1%</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">Buttons</h2>
+    <p class="sec-sub">Active-voice labels. Jade for the primary action, one per screen.</p>
+    <div class="btns">
+      <button class="btn btn-primary">Confirm holdings</button>
+      <button class="btn btn-secondary">Re-optimize</button>
+      <button class="btn btn-ghost">Dismiss</button>
+      <button class="btn btn-danger">Delete portfolio</button>
+    </div>
+  </section>
+
+  <section>
+    <h2 class="sec">Flags &amp; news</h2>
+    <p class="sec-sub">Material events inform without alarming. Rust for high, gold for medium.</p>
+    <div class="flag">
+      <div class="ft">SBP raised the policy rate by 100bps</div>
+      <div class="fb">Your fixed-income holdings (25% T-bills) may see market value dip, but reinvestment yield improves. This affects your portfolio's risk balance.</div>
+      <div class="fa"><button class="btn btn-primary" style="padding:8px 16px;font-size:13.5px;">Review &amp; re-optimize</button></div>
+    </div>
+    <div class="flag med">
+      <div class="ft">HBL board meeting scheduled</div>
+      <div class="fb">Earnings announcement expected next week — may affect your 18% banking exposure. No action needed yet.</div>
+    </div>
+
+    <div class="news"><span class="src">PSX</span><span class="hl">OGDC announces interim dividend of ₨ 4.50/share</span><span class="impact up">↑ direct</span></div>
+    <div class="news"><span class="src">SBP</span><span class="hl">Monetary policy statement due Friday</span><span class="impact" style="color:var(--info)">→ macro</span></div>
+    <div class="news"><span class="src">Recorder</span><span class="hl">Cement sector volumes decline on weak demand</span><span class="impact down">↓ sector</span></div>
+  </section>
+
+</div>
+</body>
+</html>
