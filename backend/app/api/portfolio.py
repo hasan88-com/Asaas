@@ -48,12 +48,18 @@ router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 async def _write_initial_snapshot(portfolio_id: UUID) -> None:
     from app.core.db import async_session_factory
     from app.services.performance import PerformanceService
+    from app.workers.backfill_snapshots import backfill_snapshots_for_portfolio
     async with async_session_factory() as bg_db:
         try:
             svc = PerformanceService(bg_db)
             await svc.update_portfolio_metrics(portfolio_id)
         except Exception:
             logger.exception("Initial snapshot failed for portfolio_id=%s", portfolio_id)
+    # Backfill historical snapshots from price DB so chart shows real history immediately
+    try:
+        await backfill_snapshots_for_portfolio(portfolio_id)
+    except Exception:
+        logger.exception("Snapshot backfill failed for portfolio_id=%s", portfolio_id)
 
 
 @router.post("/analyze-guest", response_model=GuestAnalyzeResponse)
