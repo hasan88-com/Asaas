@@ -42,10 +42,12 @@ class Settings(BaseSettings):
         if val.startswith("["):
             try:
                 parsed = json.loads(val)
-                return [o.strip() for o in parsed]
+                origins = [o.strip().rstrip("/") for o in parsed]
             except Exception:
-                pass
-        return [o.strip() for o in val.split(",")]
+                origins = [o.strip().rstrip("/") for o in val.split(",")]
+        else:
+            origins = [o.strip().rstrip("/") for o in val.split(",")]
+        return origins
 
     # --- Database ---
     # Use Supabase pooler URL (PgBouncer) for the application.
