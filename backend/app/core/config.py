@@ -36,8 +36,16 @@ class Settings(BaseSettings):
 
     @property
     def cors_origin_list(self) -> List[str]:
-        raw = [o.strip() for o in self.cors_origins.split(",")]
-        return raw
+        import json
+        val = self.cors_origins.strip()
+        # Handle JSON array format e.g. ["https://foo.com"] set via some dashboards
+        if val.startswith("["):
+            try:
+                parsed = json.loads(val)
+                return [o.strip() for o in parsed]
+            except Exception:
+                pass
+        return [o.strip() for o in val.split(",")]
 
     # --- Database ---
     # Use Supabase pooler URL (PgBouncer) for the application.
