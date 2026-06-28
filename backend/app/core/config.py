@@ -32,11 +32,12 @@ class Settings(BaseSettings):
     environment: str = "development"
     app_name: str = "Asaas"
     api_v1_prefix: str = "/api/v1"
-    cors_origins: str = "http://localhost:5173,http://localhost:3000,http://127.0.0.1:5173,http://127.0.0.1:3000"
+    cors_origins: str = "*"
 
     @property
     def cors_origin_list(self) -> List[str]:
-        return [o.strip() for o in self.cors_origins.split(",")]
+        raw = [o.strip() for o in self.cors_origins.split(",")]
+        return raw
 
     # --- Database ---
     # Use Supabase pooler URL (PgBouncer) for the application.
