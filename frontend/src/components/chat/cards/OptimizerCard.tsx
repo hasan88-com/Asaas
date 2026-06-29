@@ -81,11 +81,13 @@ interface OptimizerCardProps {
   currentHoldings?: HoldingResponse[]
   /** When true (e.g. user started fresh), show allocation by asset-class category. */
   groupByClass?: boolean
+  onAdjust?: () => void
+  onConfirm?: () => void
 }
 
-export function OptimizerCard({ data, mode = 'suggest', currentHoldings, groupByClass = false }: OptimizerCardProps) {
-  const handleConfirm = () => postConfirm(data.holdings)
-  const handleAdjust = () => postSuggest()
+export function OptimizerCard({ data, mode = 'suggest', currentHoldings, groupByClass = false, onAdjust, onConfirm }: OptimizerCardProps) {
+  const handleConfirm = () => { onConfirm ? onConfirm() : postConfirm(data.holdings) }
+  const handleAdjust = () => { onAdjust ? onAdjust() : undefined }
 
   const ret = `${(parseFloat(data.expected_return) * 100).toFixed(1)}%`
   const risk = `${(parseFloat(data.expected_risk) * 100).toFixed(1)}%`

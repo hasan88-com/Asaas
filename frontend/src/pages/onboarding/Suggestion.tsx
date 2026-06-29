@@ -134,6 +134,8 @@ export default function Suggestion() {
                 data={portfolio}
                 mode="suggest"
                 groupByClass={!state?.hadHoldings && !portfolio.has_existing_holdings}
+                onAdjust={() => navigate('/onboarding/holdings')}
+                onConfirm={handleConfirm}
               />
             </div>
 
