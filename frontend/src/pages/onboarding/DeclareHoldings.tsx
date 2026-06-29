@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { declareHoldings, searchMarket, getDebtInstrument } from '@/lib/api'
+import { useNavigate, useLocation } from 'react-router-dom'
+import { declareHoldings, searchMarket, getDebtInstrument, getPortfolio } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { AssetComboBox } from '@/components/ui/combobox'
@@ -70,14 +70,52 @@ async function resolveInstrumentId(symbol: string): Promise<string | null> {
 
 // ---- Main component --------------------------------------------------------
 
+interface LocationState {
+  fromAdjust?: boolean
+}
+
+function holdingResponseToRow(h: import('@/types/api').HoldingResponse): HoldingRow {
+  const ac = (h.asset_class ?? 'equity').toLowerCase() as AssetClass
+  const isBond = ac === 'tbill' || ac === 'bond'
+  return {
+    id: crypto.randomUUID(),
+    assetClass: ac,
+    symbol: h.symbol ?? '',
+    qty: h.quantity != null ? String(h.quantity) : '',
+    units: isBond && h.quantity != null ? String(Math.round(h.quantity)) : '',
+    entry_price: h.entry_price != null ? String(h.entry_price) : '',
+    interest_rate: '',
+    buy_date: h.entry_date ?? '',
+    errors: {},
+  }
+}
+
 export default function DeclareHoldings() {
   const navigate = useNavigate()
-  const [mode, setMode] = useState<'choose' | 'form'>('choose')
+  const location = useLocation()
+  const locationState = location.state as LocationState | null
+  const fromAdjust = locationState?.fromAdjust === true
+
+  const [mode, setMode] = useState<'choose' | 'form'>(fromAdjust ? 'form' : 'choose')
   const [holdings, setHoldings] = useState<HoldingRow[]>([])
   const [pickerOpen, setPickerOpen] = useState(false)
   const pickerRef = useRef<HTMLDivElement>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [loadingExisting, setLoadingExisting] = useState(fromAdjust)
   const [error, setError] = useState<string | null>(null)
+
+  // When coming from Adjust, pre-load existing holdings
+  useEffect(() => {
+    if (!fromAdjust) return
+    getPortfolio()
+      .then((p) => {
+        if (p.holdings.length > 0) {
+          setHoldings(p.holdings.map(holdingResponseToRow))
+        }
+      })
+      .catch(() => { /* leave empty — user can add manually */ })
+      .finally(() => setLoadingExisting(false))
+  }, [])
 
   // Close picker on Escape or outside click
   useEffect(() => {
@@ -177,7 +215,7 @@ export default function DeclareHoldings() {
         }
       })
       await declareHoldings(payload)
-      navigate('/onboarding/suggest', { replace: true, state: { hadHoldings: true } })
+      navigate('/onboarding/suggest', { replace: true, state: { portfolio: null, hadHoldings: true } })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Declaration failed. Please try again.')
     } finally {
@@ -196,6 +234,16 @@ export default function DeclareHoldings() {
   )
   const labelCls = 'font-sans text-[11px] font-medium text-ink'
   const errorCls = 'font-sans text-[11px] text-loss mt-0.5'
+
+  // ---- Loading screen (fetching existing holdings for adjust flow) ----------
+
+  if (loadingExisting) {
+    return (
+      <div className="min-h-screen bg-paper flex items-center justify-center">
+        <span className="w-6 h-6 rounded-full border-2 border-jade border-t-transparent animate-spin" />
+      </div>
+    )
+  }
 
   // ---- Choose screen (unchanged "Start fresh" path) ------------------------
 
@@ -230,9 +278,13 @@ export default function DeclareHoldings() {
         {/* Header */}
         <div className="text-center">
           <span className="font-display text-[28px] font-semibold text-ink block mb-1">اثاثہ</span>
-          <h1 className="font-display text-[20px] font-semibold text-ink">Declare your holdings</h1>
+          <h1 className="font-display text-[20px] font-semibold text-ink">
+            {fromAdjust ? 'Adjust your holdings' : 'Declare your holdings'}
+          </h1>
           <p className="font-sans text-[14px] text-ink-soft mt-1">
-            Add each investment you currently hold. Entry price is used for P&amp;L tracking.
+            {fromAdjust
+              ? 'Add, remove, or update your holdings. We\'ll regenerate your portfolio suggestion.'
+              : 'Add each investment you currently hold. Entry price is used for P&L tracking.'}
           </p>
         </div>
 
@@ -511,7 +563,11 @@ export default function DeclareHoldings() {
 
         {/* Footer actions */}
         <div className="flex gap-3">
-          <Button variant="ghost" onClick={() => setMode('choose')} className="flex-1 btn-press">
+          <Button
+            variant="ghost"
+            onClick={() => fromAdjust ? navigate('/onboarding/suggest', { replace: true, state: { portfolio: null } }) : setMode('choose')}
+            className="flex-1 btn-press"
+          >
             Back
           </Button>
           <Button
