@@ -71,7 +71,11 @@ export function AgentMessage({ message, showRoleLabel, activeTool }: AgentMessag
 
         {message.isStreaming && !message.text && <StreamingIndicator />}
 
-        {message.text && (
+        {message.text && message.isStreaming && (
+          <span className="whitespace-pre-wrap">{message.text}</span>
+        )}
+
+        {message.text && !message.isStreaming && (
           <ReactMarkdown
             components={{
               h2: ({ children }) => <h2 className="font-semibold text-[15px] text-ink mt-3 mb-1">{children}</h2>,
