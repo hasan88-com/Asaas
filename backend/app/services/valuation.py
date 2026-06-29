@@ -19,6 +19,54 @@ import numpy as np
 
 logger = logging.getLogger("asaas.services.valuation")
 
+# In-process TTL cache for yfinance ticker data (info, cashflow, balance_sheet).
+# Avoids repeated Yahoo Finance hits within a single deployment process.
+# TTL = 1 hour; keyed by upper-case symbol.
+_YF_CACHE: Dict[str, Any] = {}
+_YF_CACHE_TTL = 3600.0
+
+
+def _yf_cache_get(key: str) -> Optional[Any]:
+    import time
+    entry = _YF_CACHE.get(key)
+    if entry and time.monotonic() - entry["ts"] < _YF_CACHE_TTL:
+        return entry["data"]
+    return None
+
+
+def _yf_cache_set(key: str, data: Any) -> None:
+    import time
+    _YF_CACHE[key] = {"ts": time.monotonic(), "data": data}
+
+
+async def _yf_get_info(symbol: str) -> Dict[str, Any]:
+    """Fetch yfinance .info with in-process caching."""
+    import yfinance as yf
+    key = f"info:{symbol.upper()}"
+    cached = _yf_cache_get(key)
+    if cached is not None:
+        return cached
+    data = await asyncio.to_thread(lambda: yf.Ticker(symbol).info)
+    _yf_cache_set(key, data)
+    return data
+
+
+async def _yf_get_fundamentals(symbol: str):
+    """Fetch yfinance cashflow + balance_sheet + info with in-process caching."""
+    import yfinance as yf
+    key = f"fundamentals:{symbol.upper()}"
+    cached = _yf_cache_get(key)
+    if cached is not None:
+        return cached
+
+    def _fetch():
+        t = yf.Ticker(symbol)
+        return t.cashflow, t.balance_sheet, t.info
+
+    data = await asyncio.to_thread(_fetch)
+    _yf_cache_set(key, data)
+    return data
+
 _EQUITY_RISK_PREMIUM = Decimal("0.1635")  # Pakistan total ERP — Damodaran (Caa2):
 # 12.02% country risk premium + 4.33% mature-market premium. Among the world's
 # highest, so WACC lands in the high-teens/low-20s% and DCF outputs are a
@@ -124,13 +172,7 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
     Never raises — returns {'error': '...'} on total failure.
     """
     try:
-        import yfinance as yf
-
-        def _fetch():
-            ticker = yf.Ticker(symbol)
-            return ticker.info
-
-        info = await asyncio.to_thread(_fetch)
+        info = await _yf_get_info(symbol)
     except Exception as exc:
         logger.error("yfinance info fetch failed for %s: %s", symbol, exc)
         return {"symbol": symbol, "error": f"Could not fetch data: {exc}", "missing_fields": []}
@@ -188,13 +230,7 @@ async def run_dcf(
     assumptions = assumptions or {}
 
     try:
-        import yfinance as yf
-
-        def _fetch():
-            t = yf.Ticker(symbol)
-            return t.cashflow, t.balance_sheet, t.info
-
-        cashflow, balance_sheet, info = await asyncio.to_thread(_fetch)
+        cashflow, balance_sheet, info = await _yf_get_fundamentals(symbol)
     except Exception as exc:
         logger.error("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
         return {"insufficient_data": True, "reason": f"Could not fetch fundamentals: {exc}"}
@@ -331,13 +367,7 @@ async def run_monte_carlo(
         return base  # propagate the insufficient_data flag
 
     try:
-        import yfinance as yf
-
-        def _fetch():
-            t = yf.Ticker(symbol)
-            return t.info
-
-        info = await asyncio.to_thread(_fetch)
+        info = await _yf_get_info(symbol)
     except Exception:
         info = {}
 
@@ -417,12 +447,7 @@ async def run_multiples(
 
     async def _fetch_ratios(sym: str) -> Dict[str, Any]:
         try:
-            import yfinance as yf
-
-            def _get():
-                return yf.Ticker(sym).info
-
-            info = await asyncio.to_thread(_get)
+            info = await _yf_get_info(sym)
             return {
                 "symbol": sym,
                 "pe": _to_decimal(info.get("trailingPE")),
