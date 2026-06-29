@@ -36,7 +36,7 @@ export default function Register() {
       const { data, error: authErr } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${import.meta.env.VITE_SITE_URL || window.location.origin}/auth/callback` },
       })
       if (authErr) throw authErr
 
