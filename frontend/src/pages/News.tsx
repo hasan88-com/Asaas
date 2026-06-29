@@ -93,14 +93,14 @@ export default function News() {
     }, 3000)
   }
 
-  // "Affect on my portfolio?" — jump to chat and ask the AI about this headline.
+  // "Affect on my portfolio?" — jump to chat and ask the AI about this specific headline only.
   const askAffect = (item: NewsItemResponse) => {
-    const syms = item.affected_symbols?.length ? ` (mentions ${item.affected_symbols.join(', ')})` : ''
+    const syms = item.affected_symbols?.length ? ` Symbols mentioned: ${item.affected_symbols.join(', ')}.` : ''
     navigate('/chat', {
       state: {
         seedMessage:
-          `How does this news affect my portfolio? "${item.headline}"${syms}. ` +
-          `Explain the impact on my holdings and whether I should be concerned.`,
+          `Analyse only this single news item and its impact on my portfolio holdings: "${item.headline}".${syms} ` +
+          `Which of my holdings are affected, and should I be concerned? Do not discuss any other news.`,
       },
     })
   }

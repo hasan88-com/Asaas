@@ -46,6 +46,16 @@ async def run_news_analyst(
     # 1. Fetch matched news
     news_items = await fetch_relevant_news(db=db, portfolio_id=portfolio_id, limit=10)
 
+    # If the user quoted a specific headline (pattern: "…"headline"…"), filter to that item only.
+    user_msg = state.get("user_message", "")
+    import re as _re
+    _quoted = _re.search(r'"([^"]{10,})"', user_msg)
+    if _quoted:
+        target = _quoted.group(1).lower()
+        specific = [i for i in news_items if target[:60] in i.get("headline", "").lower()]
+        if specific:
+            news_items = specific
+
     # 2. Assess materiality for any items not yet scored
     for item in news_items:
         if item.get("materiality_score") is None:
@@ -54,6 +64,12 @@ async def run_news_analyst(
                 await assess_materiality(db=db, news_item_id=news_uuid)
             except Exception as exc:
                 logger.warning("Materiality assessment failed for %s: %s", item["news_id"], exc)
+
+    # Drop items confirmed as irrelevant after scoring
+    news_items = [
+        i for i in news_items
+        if i.get("materiality_score") is None or float(i["materiality_score"]) >= 0.1
+    ]
 
     if not news_items:
         state["response"] = (

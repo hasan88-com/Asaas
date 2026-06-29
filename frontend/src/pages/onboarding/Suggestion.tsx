@@ -134,13 +134,15 @@ export default function Suggestion() {
                 data={portfolio}
                 mode="suggest"
                 groupByClass={!state?.hadHoldings && !portfolio.has_existing_holdings}
+                onAdjust={() => navigate('/onboarding/holdings', { state: { fromAdjust: true } })}
+                onConfirm={handleConfirm}
               />
             </div>
 
             <div className="flex gap-3 mt-6">
               <Button
                 variant="ghost"
-                onClick={() => navigate('/onboarding/holdings')}
+                onClick={() => navigate('/onboarding/holdings', { state: { fromAdjust: true } })}
                 className="flex-1"
               >
                 Adjust
