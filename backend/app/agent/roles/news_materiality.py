@@ -65,6 +65,12 @@ async def run_news_analyst(
             except Exception as exc:
                 logger.warning("Materiality assessment failed for %s: %s", item["news_id"], exc)
 
+    # Drop items confirmed as irrelevant after scoring
+    news_items = [
+        i for i in news_items
+        if i.get("materiality_score") is None or float(i["materiality_score"]) >= 0.1
+    ]
+
     if not news_items:
         state["response"] = (
             "There are no recent news items matched to your current holdings. "

@@ -37,11 +37,18 @@ async def fetch_relevant_news(
         return []
 
     # 2. Join NewsHoldingLink → NewsItem + Instrument for symbol
+    from sqlalchemy import or_
     rows = await db.execute(
         select(NewsItem, NewsHoldingLink.relevance, Instrument.symbol)
         .join(NewsHoldingLink, NewsItem.id == NewsHoldingLink.news_id)
         .join(Instrument, NewsHoldingLink.instrument_id == Instrument.id)
         .where(NewsHoldingLink.instrument_id.in_(instrument_ids))
+        .where(
+            or_(
+                NewsItem.materiality_score.is_(None),  # not yet scored — include for scoring
+                NewsItem.materiality_score >= 0.1,     # filter out clearly irrelevant items
+            )
+        )
         .order_by(
             NewsItem.materiality_score.desc().nullslast(),
             NewsItem.published_at.desc().nullslast(),
