@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
 import { StreamingIndicator } from './StreamingIndicator'
 import { ToolRunningPill } from './ToolRunningPill'
@@ -61,7 +62,7 @@ export function AgentMessage({ message, showRoleLabel, activeTool }: AgentMessag
         </span>
       )}
 
-      <div className="bg-card border border-line rounded-[14px] rounded-bl-[4px] px-4 py-3 text-[16px] leading-[1.6] text-ink whitespace-pre-wrap break-words">
+      <div className="bg-card border border-line rounded-[14px] rounded-bl-[4px] px-4 py-3 text-[16px] leading-[1.6] text-ink break-words">
         {activeTool && (
           <div className="mb-2">
             <ToolRunningPill label={`Running ${activeTool}…`} />
@@ -70,7 +71,22 @@ export function AgentMessage({ message, showRoleLabel, activeTool }: AgentMessag
 
         {message.isStreaming && !message.text && <StreamingIndicator />}
 
-        {message.text && <span>{message.text}</span>}
+        {message.text && (
+          <ReactMarkdown
+            components={{
+              h2: ({ children }) => <h2 className="font-semibold text-[15px] text-ink mt-3 mb-1">{children}</h2>,
+              h3: ({ children }) => <h3 className="font-semibold text-[14px] text-ink mt-2 mb-0.5">{children}</h3>,
+              strong: ({ children }) => <strong className="font-semibold text-ink">{children}</strong>,
+              ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+              li: ({ children }) => <li className="text-[15px]">{children}</li>,
+              p: ({ children }) => <p className="mb-1 last:mb-0">{children}</p>,
+              hr: () => <hr className="border-line my-2" />,
+            }}
+          >
+            {message.text}
+          </ReactMarkdown>
+        )}
 
         {message.isStreaming && message.text && (
           <span className="ml-1 inline-flex">
