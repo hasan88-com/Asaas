@@ -80,6 +80,21 @@ export default function HoldingDetail() {
   const [newsItems, setNewsItems] = useState<NewsItemResponse[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
 
+  // Reset per-symbol cached data the moment the route symbol changes. The fetch
+  // effect below guards on these being null/empty, so without this, switching
+  // holdings while on the Valuation/Technical/News tab would keep showing the
+  // PREVIOUS holding's data. Done synchronously during render (React's
+  // recommended pattern) so the reset lands before the fetch effect runs.
+  const [loadedSymbol, setLoadedSymbol] = useState(symbol)
+  if (symbol !== loadedSymbol) {
+    setLoadedSymbol(symbol)
+    setValuation(null)
+    setValuationError(null)
+    setTechnical(null)
+    setTechnicalError(null)
+    setNewsItems([])
+  }
+
   useEffect(() => {
     if (!symbol) return
     getCompanyInfo(symbol)

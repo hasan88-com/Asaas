@@ -223,6 +223,7 @@ export interface HoldingResponse {
   quantity?: number
   entry_price?: number
   entry_date?: string
+  current_price?: string
   expected_return?: number
   risk?: number
 }
@@ -460,4 +461,47 @@ export interface DebtInstrument {
   outstanding_days: number | null
   remaining_years: number | null
   category: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Strategies (no-code allocation / screener)                          */
+/* ------------------------------------------------------------------ */
+export type StrategyKind = 'allocation' | 'screener'
+
+export interface ScreenerCondition {
+  field: 'sector' | 'asset_class' | 'price'
+  op: 'eq' | 'neq' | 'in' | 'gt' | 'gte' | 'lt' | 'lte'
+  value: string | number | string[]
+}
+
+export interface StrategyResponse {
+  id: string
+  user_id: string
+  name: string
+  kind: StrategyKind
+  config: Record<string, unknown>
+  created_at: string
+  updated_at?: string
+}
+
+export interface StrategyCreate {
+  name: string
+  kind: StrategyKind
+  config: Record<string, unknown>
+}
+
+export interface ScreenerMatch {
+  symbol: string
+  name?: string
+  sector?: string
+  asset_class?: string
+  current_price?: string
+}
+
+export interface StrategyRunResult {
+  kind: StrategyKind
+  allocation?: Record<string, unknown>
+  matches?: ScreenerMatch[]
+  count?: number
+  error?: string
 }

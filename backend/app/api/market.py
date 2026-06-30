@@ -37,11 +37,10 @@ async def get_price(
     Get current price for an instrument.
     Always checks cache first (to be added in Phase 1).
     """
-    # Query instrument
-    inst_result = await db.execute(
-        select(Instrument).where(Instrument.symbol == symbol)
-    )
-    instrument = inst_result.scalar_one_or_none()
+    # Resolve the instrument — auto-creating it (and backfilling prices) for a
+    # valid PSX ticker that isn't seeded yet.
+    from app.services.instrument_resolver import resolve_instrument
+    instrument = await resolve_instrument(symbol, db)
 
     if not instrument:
         raise HTTPException(
@@ -58,13 +57,21 @@ async def get_price(
     latest_price = price_result.scalars().first()
 
     if not latest_price:
-        # Fallback dummy price if not seeded yet
+        # No DB price — try the live cache/adapter waterfall before giving up.
+        # Never return a fabricated price: 404 if the symbol genuinely has none.
+        from app.data.cache import get_price as fetch_live_price
+        live = await fetch_live_price(instrument.symbol, db)
+        if live is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"No price available for {symbol}.",
+            )
         return PriceResponse(
-            symbol=symbol,
-            price=Decimal("150.00"),
+            symbol=instrument.symbol,
+            price=live,
             price_date=date.today(),
             fetched_at=datetime.now(timezone.utc),
-            source="mock"
+            source="live",
         )
 
     return PriceResponse(

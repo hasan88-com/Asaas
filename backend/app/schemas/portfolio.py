@@ -35,6 +35,7 @@ class HoldingResponse(HoldingBase):
     symbol: Optional[str] = None
     name: Optional[str] = None
     asset_class: Optional[str] = None
+    current_price: Optional[Decimal] = None
 
     class Config:
         from_attributes = True

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import List, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Request, Response, status
@@ -736,6 +736,24 @@ async def _load_active_portfolio(current_user: User, db: AsyncSession) -> Portfo
     return portfolio
 
 
+async def _attach_current_prices(holdings, db: AsyncSession) -> None:
+    """Set a (non-persisted) ``current_price`` on each holding ORM object so the
+    HoldingResponse schema can surface a live price. Batch-fetched through the
+    shared price cache/adapter waterfall; a missing price stays ``None`` — we
+    never fabricate one."""
+    symbols = [h.symbol for h in holdings if h.symbol]
+    if not symbols:
+        return
+    from app.data.cache import get_prices
+    try:
+        prices = await get_prices(symbols, db)
+    except Exception as exc:
+        logger.warning("Failed to attach current prices to holdings: %s", exc)
+        return
+    for h in holdings:
+        h.current_price = prices.get((h.symbol or "").upper())
+
+
 @router.get("", response_model=PortfolioResponse)
 async def get_portfolio(
     current_user: User = Depends(get_current_user),
@@ -748,18 +766,20 @@ async def get_portfolio(
         return JSONResponse(content=cached)
 
     portfolio = await _load_active_portfolio(current_user, db)
+    await _attach_current_prices(portfolio.holdings, db)
     payload = jsonable_encoder(PortfolioResponse.model_validate(portfolio))
     await set_cached(key, payload, 30)
     return JSONResponse(content=payload)
 
 
-@router.get("/holdings")
+@router.get("/holdings", response_model=List[HoldingResponse])
 async def get_holdings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List current user's holdings."""
+    """List current user's holdings (each with a live current_price when available)."""
     portfolio = await _load_active_portfolio(current_user, db)
+    await _attach_current_prices(portfolio.holdings, db)
     return portfolio.holdings
 
 
@@ -771,14 +791,12 @@ async def add_holding(
     db: AsyncSession = Depends(get_db),
 ):
     """'I bought' — add a holding to the user's confirmed portfolio."""
-    from app.models.instrument import Instrument
+    from app.services.instrument_resolver import resolve_instrument
 
     portfolio = await _load_active_portfolio(current_user, db)  # 404 if no active portfolio
 
-    inst_res = await db.execute(
-        select(Instrument).where(Instrument.symbol == payload.symbol)
-    )
-    inst = inst_res.scalar_one_or_none()
+    # Resolve-or-create: a valid PSX ticker not yet seeded is created on the fly.
+    inst = await resolve_instrument(payload.symbol, db)
     if not inst:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

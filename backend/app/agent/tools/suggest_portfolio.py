@@ -73,19 +73,23 @@ async def suggest_portfolio(
 
     risk_tolerance = overrides.get("risk_tolerance", profile.risk_tolerance)
     constraints = overrides.get("constraints") or profile.constraints or {}
+    method = overrides.get("method")  # optimizer method; None → profile default
 
     # 2. SBP policy rate (risk-free rate)
     risk_free_rate = await _get_sbp_rate()
 
-    # 3. Load active instruments (respecting excluded sectors)
+    # 3. Load active instruments (respecting excluded sectors / asset classes)
     excluded_sectors = constraints.get("excluded_sectors", [])
+    excluded_classes = constraints.get("excluded_asset_classes", [])
     inst_res = await db.execute(
         select(Instrument).where(Instrument.is_active == True)
     )
     all_instruments: List[Instrument] = inst_res.scalars().all()
     instruments = [
         i for i in all_instruments
-        if (i.sector or "") not in excluded_sectors and is_valid_candidate(i)
+        if (i.sector or "") not in excluded_sectors
+        and i.asset_class not in excluded_classes
+        and is_valid_candidate(i)
     ]
 
     if not instruments:
@@ -120,6 +124,7 @@ async def suggest_portfolio(
         sectors=sectors,
         risk_tolerance=risk_tolerance,
         constraints=constraints,
+        method=method,
     )
 
     if not weights or all(w == 0 for w in weights.values()):

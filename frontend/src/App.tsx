@@ -24,6 +24,7 @@ const Chat = lazy(() => import('@/pages/Chat'))
 const News = lazy(() => import('@/pages/News'))
 const Flags = lazy(() => import('@/pages/Flags'))
 const HoldingDetail = lazy(() => import('@/pages/HoldingDetail'))
+const Strategies = lazy(() => import('@/pages/Strategies'))
 
 // Market
 const DebtMarket = lazy(() => import('@/pages/DebtMarket'))
@@ -74,6 +75,7 @@ export default function App() {
               <Route path="/debt-market" element={<DebtMarket />} />
               <Route path="/flags" element={<Flags />} />
               <Route path="/holdings/:symbol" element={<HoldingDetail />} />
+              <Route path="/strategies" element={<Strategies />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/portfolio" element={<PortfolioManagement />} />
             </Route>

@@ -20,6 +20,9 @@ import type {
   NewsScrapeStatus,
   MarketSentimentResponse,
   RiskMetricsResponse,
+  StrategyResponse,
+  StrategyCreate,
+  StrategyRunResult,
 } from '@/types/api'
 import type { SSEEvent } from '@/types/chat'
 
@@ -120,6 +123,16 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
     })
     if (!res.ok) throw new ApiError(`PUT ${path} → ${res.status}`, res.status)
     return res.json() as Promise<T>
+  })
+}
+
+async function del(path: string): Promise<void> {
+  return withSessionRetry(path, async () => {
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'DELETE',
+      headers: await authHeaders(),
+    })
+    if (!res.ok) throw new ApiError(`DELETE ${path} → ${res.status}`, res.status)
   })
 }
 
@@ -559,4 +572,23 @@ export interface DebtMarketResponse {
 
 export function getDebtMarket(): Promise<DebtMarketResponse> {
   return get<DebtMarketResponse>('/market/debt-market')
+}
+
+/* ------------------------------------------------------------------ */
+/* Strategies                                                          */
+/* ------------------------------------------------------------------ */
+export function getStrategies(): Promise<StrategyResponse[]> {
+  return get<StrategyResponse[]>('/strategies')
+}
+
+export function createStrategy(body: StrategyCreate): Promise<StrategyResponse> {
+  return post<StrategyResponse>('/strategies', body)
+}
+
+export function deleteStrategy(id: string): Promise<void> {
+  return del(`/strategies/${id}`)
+}
+
+export function runStrategy(id: string): Promise<StrategyRunResult> {
+  return post<StrategyRunResult>(`/strategies/${id}/run`)
 }

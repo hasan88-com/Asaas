@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Settings,
   BarChart3,
+  Sliders,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -20,6 +21,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: '/chat', label: 'Chat', icon: MessageCircle },
   { to: '/news', label: 'News', icon: Newspaper },
   { to: '/debt-market', label: 'Debt', icon: BarChart3 },
+  { to: '/strategies', label: 'Strategies', icon: Sliders },
   { to: '/flags', label: 'Flags', icon: AlertTriangle },
   { to: '/settings', label: 'Settings', icon: Settings },
 ]
