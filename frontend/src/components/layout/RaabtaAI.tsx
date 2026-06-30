@@ -170,6 +170,15 @@ export function RaabtaAI() {
         </button>
       )}
 
+      {/* Click-outside backdrop — dismisses the panel back to the floating icon */}
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-ink/10"
+          onClick={() => setOpen(false)}
+          aria-hidden
+        />
+      )}
+
       {/* Panel */}
       {open && (
         <div
