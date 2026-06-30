@@ -1080,3 +1080,47 @@ async def get_portfolio_risk(
     payload = jsonable_encoder(data)
     await set_cached(key, payload, 300)
     return JSONResponse(content=payload)
+
+
+@router.get("/holdings/{symbol}/history")
+async def get_holding_history(
+    symbol: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Daily PKR value series for one of the user's holdings (qty × price over
+    time; USD instruments converted at the live FX rate). Mirrors the portfolio
+    performance chart so each holding has its own graph. {symbol, history:[{date,value}]}."""
+    from app.models.instrument import Instrument
+    from app.models.price import Price
+    from sqlalchemy import asc
+
+    portfolio = await _load_active_portfolio(current_user, db)
+    sym = symbol.upper()
+    inst = (await db.execute(
+        select(Instrument).where(Instrument.symbol == sym)
+    )).scalar_one_or_none()
+    if inst is None:
+        return {"symbol": sym, "history": []}
+
+    holding = next((h for h in portfolio.holdings if h.instrument_id == inst.id), None)
+    qty = Decimal(str(holding.quantity)) if holding and holding.quantity else Decimal("1")
+
+    mult = Decimal("1")
+    if (inst.currency or "").upper() == "USD":
+        try:
+            from app.core.market import get_usd_pkr_rate
+            mult = await get_usd_pkr_rate()
+        except Exception:
+            mult = Decimal("1")
+
+    rows = (await db.execute(
+        select(Price.price_date, Price.price)
+        .where(Price.instrument_id == inst.id)
+        .order_by(asc(Price.price_date))
+    )).fetchall()
+    history = [
+        {"date": str(r[0]), "value": str((Decimal(str(r[1])) * mult * qty).quantize(Decimal("0.01")))}
+        for r in rows
+    ]
+    return {"symbol": sym, "history": history}

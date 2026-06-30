@@ -1,12 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AssetComboBox } from '@/components/ui/combobox'
 import { ASSET_UNIVERSE, type AssetCategory } from '@/data/assetUniverse'
-import { addHolding, sellHolding, updateHolding } from '@/lib/api'
+import { addHolding, sellHolding, updateHolding, getProfile, putProfile } from '@/lib/api'
 import { cn } from '@/lib/utils'
-import type { HoldingResponse } from '@/types/api'
+import type { HoldingResponse, ProfileResponse } from '@/types/api'
 
-type Panel = 'buy' | 'sell' | 'update' | null
+type Panel = 'buy' | 'sell' | 'update' | 'risk' | null
+
+const RISK_TOLERANCES = ['conservative', 'moderately_conservative', 'moderate', 'aggressive', 'very_aggressive'] as const
+const HORIZONS = ['short', 'medium', 'long'] as const
+const titleCase = (s: string) => s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
 
 const CAT_FILTER: Record<AssetCategory, readonly string[]> = {
   stock: ['equity'],
@@ -50,6 +54,17 @@ export function MyActivity({
   // update
   const [updId, setUpdId] = useState('')
   const [updPrice, setUpdPrice] = useState('')
+  // risk profile
+  const [riskTol, setRiskTol] = useState<string>('moderate')
+  const [horizon, setHorizon] = useState<string>('medium')
+
+  // Prefill the risk-profile form from the current profile when its panel opens.
+  useEffect(() => {
+    if (panel !== 'risk') return
+    getProfile()
+      .then((p) => { if (p?.risk_tolerance) setRiskTol(p.risk_tolerance); if (p?.horizon) setHorizon(p.horizon) })
+      .catch(() => {})
+  }, [panel])
 
   const openPanel = (p: Panel) => { setError(null); setPanel(panel === p ? null : p) }
   const close = () => { setPanel(null); setError(null); setSubmitting(false) }
@@ -84,6 +99,7 @@ export function MyActivity({
         <Button variant={panel === 'buy' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('buy')}>I bought</Button>
         <Button variant={panel === 'sell' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('sell')}>I sold</Button>
         <Button variant={panel === 'update' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('update')}>Update price</Button>
+        <Button variant={panel === 'risk' ? 'primary' : 'outline'} size="sm" onClick={() => openPanel('risk')}>Risk profile</Button>
       </div>
 
       {/* I bought */}
@@ -154,8 +170,55 @@ export function MyActivity({
               <ActivityFooter error={error} submitting={submitting} disabled={!sellValid} onCancel={close} onSubmit={() =>
                 run(() => sellHolding({ holding_id: sellId, quantity: sellQty, price: sellPrice, date: sellDate || undefined }))
               } />
+              {sellId && (() => {
+                const sel = sellable.find((h) => h.id === sellId)
+                return sel ? (
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => run(() => sellHolding({
+                      holding_id: sellId,
+                      quantity: String(sel.quantity ?? 0),
+                      price: sellPrice || String(sel.current_price ?? sel.entry_price ?? 0),
+                      date: sellDate || undefined,
+                    }))}
+                    className="self-start font-mono text-[12px] text-loss hover:underline disabled:opacity-50"
+                  >
+                    Liquidate entire holding ({sel.quantity} units)
+                  </button>
+                ) : null
+              })()}
             </>
           )}
+        </div>
+      )}
+
+      {/* Risk profile (quick inline edit) */}
+      {panel === 'risk' && (
+        <div className="border border-line rounded-[10px] p-4 flex flex-col gap-3">
+          <p className="font-sans text-[13px] text-ink-soft">
+            Update your risk profile — used by the optimiser and suggestions.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <label className={labelCls}>Risk tolerance</label>
+              <select className={inputCls} value={riskTol} onChange={(e) => setRiskTol(e.target.value)}>
+                {RISK_TOLERANCES.map((r) => <option key={r} value={r}>{titleCase(r)}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className={labelCls}>Horizon</label>
+              <select className={inputCls} value={horizon} onChange={(e) => setHorizon(e.target.value)}>
+                {HORIZONS.map((h) => <option key={h} value={h}>{titleCase(h)}</option>)}
+              </select>
+            </div>
+          </div>
+          <ActivityFooter error={error} submitting={submitting} disabled={false} onCancel={close} onSubmit={() =>
+            run(() => putProfile({
+              risk_tolerance: riskTol as ProfileResponse['risk_tolerance'],
+              horizon: horizon as ProfileResponse['horizon'],
+            }))
+          } />
         </div>
       )}
 

@@ -1,14 +1,16 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import { getCompanyInfo, postValuation, getTechnical, getNewsFeed, getDebtInstrument, getPortfolio } from '@/lib/api'
+import { getCompanyInfo, postValuation, getTechnical, getNewsFeed, getDebtInstrument, getPortfolio, getHoldingHistory } from '@/lib/api'
 import { getCapabilities } from '@/lib/capabilities'
 import { ValuationCard } from '@/components/chat/cards/ValuationCard'
 import { TechnicalCard } from '@/components/chat/cards/TechnicalCard'
+import { PerformanceLine } from '@/components/charts/PerformanceLine'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
 import type { ValuationResponse, TechnicalResponse, NewsItemResponse, DebtInstrument, HoldingResponse } from '@/types/api'
 
 type Tab = 'overview' | 'valuation' | 'technical' | 'news'
+type HoldRange = '1w' | '1m' | '6m' | '1y'
 
 const TAB_LABELS: Record<Tab, string> = {
   overview: 'Overview',
@@ -80,6 +82,10 @@ export default function HoldingDetail() {
   const [newsItems, setNewsItems] = useState<NewsItemResponse[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
 
+  // Per-holding value history (its own performance graph, like the dashboard's).
+  const [holdHistory, setHoldHistory] = useState<{ date: string; value: string }[]>([])
+  const [holdRange, setHoldRange] = useState<HoldRange>('1m')
+
   // Reset all per-symbol lazy state when navigating between holdings — otherwise
   // the fetch-guards below (!valuation, !technical, newsItems.length===0) see
   // stale data from the previous symbol and skip refetching.
@@ -96,7 +102,16 @@ export default function HoldingDetail() {
     setTechnicalError(null)
     setNewsItems([])
     setNewsLoading(false)
+    setHoldHistory([])
   }, [symbol])
+
+  // Per-holding value history for its performance graph (skip fixed income).
+  useEffect(() => {
+    if (!symbol || isFixedIncome) return
+    getHoldingHistory(symbol)
+      .then((r) => setHoldHistory(r.history ?? []))
+      .catch(() => setHoldHistory([]))
+  }, [symbol, isFixedIncome])
 
   useEffect(() => {
     if (!symbol) return
@@ -152,6 +167,15 @@ export default function HoldingDetail() {
         .finally(() => setNewsLoading(false))
     }
   }, [tab, symbol, debtSettled, isFixedIncome])
+
+  // Window the holding history to the selected range (falls back to full series).
+  const holdVisible = useMemo(() => {
+    if (holdHistory.length === 0) return holdHistory
+    const days: Record<HoldRange, number> = { '1w': 7, '1m': 30, '6m': 180, '1y': 365 }
+    const cutoff = Date.now() - days[holdRange] * 86_400_000
+    const windowed = holdHistory.filter((h) => new Date(h.date).getTime() >= cutoff)
+    return windowed.length >= 2 ? windowed : holdHistory
+  }, [holdHistory, holdRange])
 
   if (!symbol) return null
 
@@ -221,6 +245,30 @@ export default function HoldingDetail() {
       {/* Tab panels */}
       {tab === 'overview' && (
         <div className="flex flex-col gap-4">
+          {/* Per-holding performance graph (skips fixed income) */}
+          {!isFixedIncome && holdVisible.length > 1 && (
+            <div className="bg-card border border-line rounded-[10px] p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint">Performance</span>
+                <div className="flex gap-1">
+                  {(['1w', '1m', '6m', '1y'] as HoldRange[]).map((r) => (
+                    <button
+                      key={r}
+                      type="button"
+                      onClick={() => setHoldRange(r)}
+                      className={cn(
+                        'px-2 py-0.5 rounded-[6px] font-mono text-[11px] uppercase transition-colors',
+                        holdRange === r ? 'bg-jade text-white' : 'text-ink-faint hover:text-ink hover:bg-line-soft',
+                      )}
+                    >
+                      {r}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <PerformanceLine history={holdVisible} height={200} lineColor="#0F6E56" />
+            </div>
+          )}
           {isFixedIncome ? (
             debt ? (
               <>

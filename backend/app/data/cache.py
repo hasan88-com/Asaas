@@ -49,10 +49,31 @@ async def set_cached_price(symbol: str, price: Decimal, ttl_seconds: int):
         logger.warning(f"Failed to write to Redis cache for {symbol}: {e}")
 
 
+async def _to_pkr(price, currency: Optional[str]) -> Optional[Decimal]:
+    """Convert a native price to PKR. USD-denominated instruments (commodities,
+    global stocks) are multiplied by the live USD/PKR rate so every price the app
+    sees is PKR. PKR-native assets (PSX, crypto via CoinGecko-PKR, tbills) pass
+    through. On FX failure the unconverted price is returned (logged)."""
+    if price is None:
+        return None
+    dec = Decimal(str(price))
+    if (currency or "").upper() != "USD":
+        return dec
+    try:
+        from app.core.market import get_usd_pkr_rate
+        fx = await get_usd_pkr_rate()
+        return dec * fx
+    except Exception as exc:
+        logger.warning("USD->PKR conversion failed (%s) — returning unconverted price.", exc)
+        return dec
+
+
 async def get_price(symbol: str, db: AsyncSession) -> Optional[Decimal]:
     """
-    Main read-through entry point.
+    Main read-through entry point. Always returns a PKR price.
     Checks Redis -> Checks DB -> Fetches Adapter -> Updates DB & Redis.
+    USD-denominated instruments are converted to PKR on the way out (DB rows stay
+    in their source currency); the Redis cache therefore stores the PKR value.
     """
     symbol_upper = symbol.upper()
 
@@ -103,9 +124,9 @@ async def get_price(symbol: str, db: AsyncSession) -> Optional[Decimal]:
             is_fresh = True
 
     if is_fresh and latest_db_price:
-        db_price_decimal = Decimal(str(latest_db_price.price))
-        await set_cached_price(symbol_upper, db_price_decimal, ttl)
-        return db_price_decimal
+        pkr = await _to_pkr(latest_db_price.price, instrument.currency)
+        await set_cached_price(symbol_upper, pkr, ttl)
+        return pkr
 
     # 4. Fetch from Adapter
     fetched_data = None
@@ -165,17 +186,18 @@ async def get_price(symbol: str, db: AsyncSession) -> Optional[Decimal]:
         await db.execute(stmt)
         await db.commit()
 
-        # Update cache
-        await set_cached_price(symbol_upper, price_val, ttl)
-        return price_val
+        # Update cache with the PKR value (DB row above keeps the source currency)
+        pkr = await _to_pkr(price_val, instrument.currency)
+        await set_cached_price(symbol_upper, pkr, ttl)
+        return pkr
 
     # 5. Last resort fallback to stale DB price if adapter failed
     if latest_db_price:
         logger.warning(f"Adapter fetch failed. Falling back to stale DB price for {symbol_upper}.")
-        db_price_decimal = Decimal(str(latest_db_price.price))
+        pkr = await _to_pkr(latest_db_price.price, instrument.currency)
         # Cache for a short time so we don't spam the adapter in next requests
-        await set_cached_price(symbol_upper, db_price_decimal, 30)
-        return db_price_decimal
+        await set_cached_price(symbol_upper, pkr, 30)
+        return pkr
 
     return None
 
