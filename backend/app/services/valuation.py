@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
@@ -130,35 +130,176 @@ async def _do_fetch_fundamentals(symbol: str, cached: Optional[Dict[str, Any]]) 
         logger.warning("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
 
     info = info or {}
-    has_price = (
-        info.get("regularMarketPrice") is not None
-        or info.get("currentPrice") is not None
-    )
-    looks_empty = (
-        not has_price
-        and _df_empty(income)
-        and _df_empty(cashflow)
-        and _df_empty(balance)
+    # A fetch only counts as "complete" when it brought financial statements.
+    # On a throttled cloud IP (Render) Yahoo often returns a price-only / empty
+    # response; treating that as success would persist a thin bundle OVER the
+    # good DB seed and wipe P/E/EV-EBITDA/P/B. So when statements are missing we
+    # serve the persisted snapshot instead and never let an empty fetch clobber it.
+    statements_present = not (
+        _df_empty(income) and _df_empty(cashflow) and _df_empty(balance)
     )
 
-    if looks_empty:
-        if cached:
-            logger.info("yfinance throttled for %s — serving last-known-good fundamentals.", symbol)
-            stale = dict(cached)
-            stale["stale"] = True
-            return stale
-        # Nothing cached and nothing fetched — return uncached so we retry next call.
-        return {
+    if statements_present:
+        bundle = {
             "info": info, "income": income, "cashflow": cashflow,
-            "balance": balance, "fetched_at": now, "stale": True,
+            "balance": balance, "fetched_at": now, "stale": False,
         }
+        _fundamentals_cache[symbol] = bundle
+        await _persist_fundamentals(symbol, bundle)  # merge-upsert (never erases)
+        return bundle
 
-    bundle = {
-        "info": info, "income": income, "cashflow": cashflow,
-        "balance": balance, "fetched_at": now, "stale": False,
-    }
-    _fundamentals_cache[symbol] = bundle
+    # No statements this time → prefer the DB-persisted last-known-good.
+    persisted = await _load_persisted_fundamentals(symbol)
+    if persisted is not None:
+        logger.info("No live statements for %s — serving DB-persisted fundamentals.", symbol)
+        # If the live call still gave fresh `info`, merge it over the cached info.
+        if info:
+            persisted = {**persisted, "info": {**persisted.get("info", {}), **{k: v for k, v in info.items() if v is not None}}}
+        _fundamentals_cache[symbol] = persisted
+        if info:
+            await _persist_fundamentals(symbol, {"info": info, "income": None, "cashflow": None, "balance": None})
+        return persisted
+
+    if cached:
+        stale = dict(cached); stale["stale"] = True
+        return stale
+
+    # Nothing anywhere — return whatever info we have (P/E may still resolve), and
+    # seed it so a later request has something to merge onto.
+    bundle = {"info": info, "income": income, "cashflow": cashflow, "balance": balance, "fetched_at": now, "stale": True}
+    if info:
+        await _persist_fundamentals(symbol, bundle)
     return bundle
+
+
+# --- DB-persisted fundamentals (last-known-good for rate-limited environments) --
+
+_CACHED_INFO_KEYS = (
+    "regularMarketPrice", "currentPrice", "marketCap", "sharesOutstanding",
+    "trailingPE", "forwardPE", "trailingEps", "priceToBook", "bookValue",
+    "enterpriseValue", "enterpriseToEbitda", "ebitda", "priceToSalesTrailing12Months",
+    "beta", "earningsGrowth", "dividendYield", "returnOnEquity", "returnOnAssets",
+    "debtToEquity", "currentRatio", "revenueGrowth", "longName", "shortName",
+    "sector", "industry", "country", "currency",
+)
+
+
+def _coerce_json(v: Any) -> Any:
+    if v is None or isinstance(v, (bool, str)):
+        return v
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def _stmt_latest_col(df: Any) -> Dict[str, float]:
+    """Latest fiscal column of a statement as {label: float} (JSON-safe)."""
+    if _df_empty(df):
+        return {}
+    out: Dict[str, float] = {}
+    try:
+        col = df.iloc[:, 0]
+        for idx, val in col.items():
+            if val is None:
+                continue
+            try:
+                f = float(val)
+            except (TypeError, ValueError):
+                continue
+            if f == f:  # not NaN
+                out[str(idx)] = f
+    except Exception:
+        return {}
+    return out
+
+
+def _serialize_bundle(bundle: Dict[str, Any]) -> Dict[str, Any]:
+    info = bundle.get("info") or {}
+    return {
+        "info": {k: _coerce_json(info.get(k)) for k in _CACHED_INFO_KEYS if info.get(k) is not None},
+        "income": _stmt_latest_col(bundle.get("income")),
+        "cashflow": _stmt_latest_col(bundle.get("cashflow")),
+        "balance": _stmt_latest_col(bundle.get("balance")),
+    }
+
+
+def _deserialize_bundle(payload: Dict[str, Any]) -> Dict[str, Any]:
+    import pandas as pd
+
+    def _df(d):
+        if not d:
+            return None
+        return pd.Series(d, dtype="float64").to_frame("v")  # index=labels, 1 col → _find_row works
+
+    return {
+        "info": payload.get("info") or {},
+        "income": _df(payload.get("income")),
+        "cashflow": _df(payload.get("cashflow")),
+        "balance": _df(payload.get("balance")),
+        "fetched_at": time.time(),
+        "stale": True,
+    }
+
+
+async def _persist_fundamentals(symbol: str, bundle: Dict[str, Any]) -> None:
+    """Upsert a JSON snapshot of the fundamentals for this symbol (best-effort)."""
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from app.core.db import async_session_factory
+        from app.models.instrument import Instrument
+        from app.models.instrument_fundamentals import InstrumentFundamentals
+
+        new = _serialize_bundle(bundle)
+        sym = symbol.upper()
+        async with async_session_factory() as db:
+            inst = (await db.execute(
+                select(Instrument).where(Instrument.symbol == sym)
+            )).scalar_one_or_none()
+            if inst is None:
+                return
+            # Merge with any existing snapshot so a partial fetch never erases
+            # previously-captured statements/info (only fills/refreshes them).
+            existing = (await db.execute(
+                select(InstrumentFundamentals).where(InstrumentFundamentals.instrument_id == inst.id)
+            )).scalar_one_or_none()
+            old = existing.payload if existing else {}
+            payload = {
+                "info": {**(old.get("info") or {}), **(new.get("info") or {})},
+                "income": new.get("income") or old.get("income") or {},
+                "cashflow": new.get("cashflow") or old.get("cashflow") or {},
+                "balance": new.get("balance") or old.get("balance") or {},
+            }
+            now = datetime.now(timezone.utc)
+            stmt = pg_insert(InstrumentFundamentals).values(
+                instrument_id=inst.id, symbol=sym, payload=payload, fetched_at=now,
+            ).on_conflict_do_update(
+                index_elements=["instrument_id"],
+                set_={"payload": payload, "fetched_at": now, "symbol": sym},
+            )
+            await db.execute(stmt)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Persist fundamentals failed for %s: %s", symbol, exc)
+
+
+async def _load_persisted_fundamentals(symbol: str) -> Optional[Dict[str, Any]]:
+    try:
+        from sqlalchemy import select
+        from app.core.db import async_session_factory
+        from app.models.instrument_fundamentals import InstrumentFundamentals
+
+        async with async_session_factory() as db:
+            row = (await db.execute(
+                select(InstrumentFundamentals).where(InstrumentFundamentals.symbol == symbol.upper())
+            )).scalar_one_or_none()
+            if row is None:
+                return None
+            return _deserialize_bundle(row.payload)
+    except Exception as exc:
+        logger.warning("Load persisted fundamentals failed for %s: %s", symbol, exc)
+        return None
 
 
 def _yf_equity_symbol(symbol: str) -> str:
