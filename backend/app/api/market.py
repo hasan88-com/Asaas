@@ -34,14 +34,13 @@ async def get_price(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Get current price for an instrument.
-    Always checks cache first (to be added in Phase 1).
+    Get current price for an instrument. Resolves the symbol against an
+    existing Instrument row, or — for a valid-looking PSX ticker not yet
+    seeded — fetches and registers it on demand via the PSX adapter waterfall.
     """
-    # Query instrument
-    inst_result = await db.execute(
-        select(Instrument).where(Instrument.symbol == symbol)
-    )
-    instrument = inst_result.scalar_one_or_none()
+    from app.services.instrument_resolver import resolve_instrument
+
+    instrument = await resolve_instrument(symbol, db)
 
     if not instrument:
         raise HTTPException(
@@ -58,13 +57,10 @@ async def get_price(
     latest_price = price_result.scalars().first()
 
     if not latest_price:
-        # Fallback dummy price if not seeded yet
-        return PriceResponse(
-            symbol=symbol,
-            price=Decimal("150.00"),
-            price_date=date.today(),
-            fetched_at=datetime.now(timezone.utc),
-            source="mock"
+        # No price on file even after resolution — be honest, don't fabricate one.
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No price available for {symbol} yet.",
         )
 
     return PriceResponse(

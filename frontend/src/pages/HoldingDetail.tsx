@@ -80,6 +80,24 @@ export default function HoldingDetail() {
   const [newsItems, setNewsItems] = useState<NewsItemResponse[]>([])
   const [newsLoading, setNewsLoading] = useState(false)
 
+  // Reset all per-symbol lazy state when navigating between holdings — otherwise
+  // the fetch-guards below (!valuation, !technical, newsItems.length===0) see
+  // stale data from the previous symbol and skip refetching.
+  useEffect(() => {
+    setCompany(null)
+    setCompanyLoading(true)
+    setDebt(null)
+    setHolding(null)
+    setValuation(null)
+    setValuationLoading(false)
+    setValuationError(null)
+    setTechnical(null)
+    setTechnicalLoading(false)
+    setTechnicalError(null)
+    setNewsItems([])
+    setNewsLoading(false)
+  }, [symbol])
+
   useEffect(() => {
     if (!symbol) return
     getCompanyInfo(symbol)

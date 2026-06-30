@@ -123,6 +123,16 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
   })
 }
 
+async function del(path: string): Promise<void> {
+  return withSessionRetry(path, async () => {
+    const res = await fetch(`${BASE}${path}`, {
+      method: 'DELETE',
+      headers: await authHeaders(),
+    })
+    if (!res.ok) throw new ApiError(`DELETE ${path} → ${res.status}`, res.status)
+  })
+}
+
 /* ------------------------------------------------------------------ */
 /* Response transformers — map backend shapes to frontend types          */
 /* ------------------------------------------------------------------ */
@@ -559,4 +569,25 @@ export interface DebtMarketResponse {
 
 export function getDebtMarket(): Promise<DebtMarketResponse> {
   return get<DebtMarketResponse>('/market/debt-market')
+}
+
+/* ------------------------------------------------------------------ */
+/* Strategies — no-code allocation/screener builder                     */
+/* ------------------------------------------------------------------ */
+import type { StrategyCreateInput, StrategyResponse as StrategyResponseType, StrategyRunResult } from '@/types/api'
+
+export function getStrategies(): Promise<StrategyResponseType[]> {
+  return get<StrategyResponseType[]>('/strategies')
+}
+
+export function createStrategy(input: StrategyCreateInput): Promise<StrategyResponseType> {
+  return post<StrategyResponseType>('/strategies', input)
+}
+
+export function deleteStrategy(id: string): Promise<void> {
+  return del(`/strategies/${id}`)
+}
+
+export function runStrategy(id: string): Promise<StrategyRunResult> {
+  return post<StrategyRunResult>(`/strategies/${id}/run`)
 }

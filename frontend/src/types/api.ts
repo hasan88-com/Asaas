@@ -225,6 +225,7 @@ export interface HoldingResponse {
   entry_date?: string
   expected_return?: number
   risk?: number
+  current_price?: number
 }
 
 export interface PortfolioResponse {
@@ -460,4 +461,29 @@ export interface DebtInstrument {
   outstanding_days: number | null
   remaining_years: number | null
   category: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Strategies — no-code allocation/screener builder                     */
+/* ------------------------------------------------------------------ */
+export type StrategyKind = 'allocation' | 'screener'
+
+export interface StrategyCreateInput {
+  name: string
+  kind: StrategyKind
+  config: Record<string, unknown>
+}
+
+export interface StrategyResponse {
+  id: string
+  name: string
+  kind: StrategyKind
+  config: Record<string, unknown>
+  created_at: string
+  updated_at: string
+}
+
+export interface StrategyRunResult {
+  kind: StrategyKind
+  result: Record<string, unknown>
 }

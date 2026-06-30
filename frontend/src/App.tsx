@@ -32,6 +32,7 @@ const NewsChat = lazy(() => import('@/pages/NewsChat'))
 // Account
 const Settings = lazy(() => import('@/pages/Settings'))
 const PortfolioManagement = lazy(() => import('@/pages/PortfolioManagement'))
+const Strategies = lazy(() => import('@/pages/Strategies'))
 
 function PageLoader() {
   return (
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="/holdings/:symbol" element={<HoldingDetail />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/portfolio" element={<PortfolioManagement />} />
+              <Route path="/strategies" element={<Strategies />} />
             </Route>
           </Route>
 
