@@ -97,9 +97,16 @@ export default function PortfolioManagement() {
                     <span className="font-mono text-[13px] font-semibold text-ink">{h.symbol}</span>
                     <span className="font-sans text-[13px] text-ink-soft">{h.name}</span>
                   </div>
-                  <span className="font-mono text-[13px] tabular-nums text-ink">
-                    {(h.weight * 100).toFixed(1)}%
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {h.current_price != null && (
+                      <span className="font-mono text-[12px] tabular-nums text-ink-faint">
+                        ₨{h.current_price.toLocaleString('en-PK')}
+                      </span>
+                    )}
+                    <span className="font-mono text-[13px] tabular-nums text-ink">
+                      {(h.weight * 100).toFixed(1)}%
+                    </span>
+                  </div>
                 </li>
               ))}
             </ul>

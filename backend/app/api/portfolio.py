@@ -715,6 +715,21 @@ async def analyze_portfolio(
     return await check_diversification(db=db, portfolio_id=portfolio_id)
 
 
+async def _holdings_with_prices(holdings: list[Holding], db: AsyncSession) -> list[HoldingResponse]:
+    """Serialize holdings with their current market price attached."""
+    from app.data.cache import get_prices
+
+    symbols = [h.symbol for h in holdings if h.symbol]
+    prices = await get_prices(symbols, db) if symbols else {}
+    out = []
+    for h in holdings:
+        resp = HoldingResponse.model_validate(h)
+        if h.symbol:
+            resp.current_price = prices.get(h.symbol.upper())
+        out.append(resp)
+    return out
+
+
 async def _load_active_portfolio(current_user: User, db: AsyncSession) -> Portfolio:
     """Load the user's active (non-draft) portfolio ORM object, or raise 404.
 
@@ -748,19 +763,21 @@ async def get_portfolio(
         return JSONResponse(content=cached)
 
     portfolio = await _load_active_portfolio(current_user, db)
-    payload = jsonable_encoder(PortfolioResponse.model_validate(portfolio))
+    response = PortfolioResponse.model_validate(portfolio)
+    response.holdings = await _holdings_with_prices(portfolio.holdings, db)
+    payload = jsonable_encoder(response)
     await set_cached(key, payload, 30)
     return JSONResponse(content=payload)
 
 
-@router.get("/holdings")
+@router.get("/holdings", response_model=list[HoldingResponse])
 async def get_holdings(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List current user's holdings."""
+    """List current user's holdings, each with its current market price."""
     portfolio = await _load_active_portfolio(current_user, db)
-    return portfolio.holdings
+    return await _holdings_with_prices(portfolio.holdings, db)
 
 
 @router.post("/holdings/add", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
@@ -771,14 +788,11 @@ async def add_holding(
     db: AsyncSession = Depends(get_db),
 ):
     """'I bought' — add a holding to the user's confirmed portfolio."""
-    from app.models.instrument import Instrument
+    from app.services.instrument_resolver import resolve_instrument
 
     portfolio = await _load_active_portfolio(current_user, db)  # 404 if no active portfolio
 
-    inst_res = await db.execute(
-        select(Instrument).where(Instrument.symbol == payload.symbol)
-    )
-    inst = inst_res.scalar_one_or_none()
+    inst = await resolve_instrument(payload.symbol, db)
     if not inst:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -6,6 +6,7 @@ import {
   AlertTriangle,
   Settings,
   BarChart3,
+  Sparkles,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -17,6 +18,7 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { to: '/strategies', label: 'Strategies', icon: Sparkles },
   { to: '/chat', label: 'Chat', icon: MessageCircle },
   { to: '/news', label: 'News', icon: Newspaper },
   { to: '/debt-market', label: 'Debt', icon: BarChart3 },
