@@ -11,12 +11,12 @@ import { MarketTicker } from '@/components/layout/MarketTicker'
 
 const FAQ_ITEMS = [
   {
-    q: 'What is Asaas?',
-    a: "Asaas is Pakistan's AI-powered wealth platform. It uses modern portfolio theory, live market data, and seven specialist AI agents to optimise, monitor, and explain your portfolio in plain language.",
+    q: 'What is Asaasa?',
+    a: "Asaasa is Pakistan's AI-powered wealth platform. It uses modern portfolio theory, live market data, and seven specialist AI agents to optimise, monitor, and explain your portfolio in plain language.",
   },
   {
     q: 'Do I need to be an expert investor?',
-    a: 'No. Asaas handles the complexity — risk profiling, optimisation, monitoring — and presents everything in plain language. You stay in control; the agent does the heavy lifting.',
+    a: 'No. Asaasa handles the complexity — risk profiling, optimisation, monitoring — and presents everything in plain language. You stay in control; the agent does the heavy lifting.',
   },
   {
     q: 'How does the AI agent work?',
@@ -255,7 +255,7 @@ export default function Landing() {
         <header className="flex items-center justify-between px-6 h-14 border-b border-line bg-card/90 backdrop-blur-sm z-40 relative">
           <div className="flex items-center gap-4">
             <Link to="/" className="flex items-center gap-2">
-              <img src="/logo.png" alt="Asaas" className="h-8 w-auto" />
+              <img src="/logo.png" alt="Asaasa" className="h-8 w-auto" />
               <span className="font-display text-[18px] font-semibold text-ink hidden sm:block">اثاثہ</span>
             </Link>
             <nav className="hidden md:flex items-center gap-5 ml-4">
@@ -294,7 +294,7 @@ export default function Landing() {
             <h1 className="font-display font-semibold text-ink leading-[1.05]">
               <span className="block text-[48px] md:text-[64px]">Build a Smarter</span>
               <span className="block text-[48px] md:text-[64px]">Portfolio with</span>
-              <span className="block text-[48px] md:text-[64px] text-jade">Asaas.</span>
+              <span className="block text-[48px] md:text-[64px] text-jade">Asaasa.</span>
             </h1>
             <p className="font-sans text-[17px] leading-[1.6] text-ink-soft max-w-xl">
               Pakistan's only agentic wealth platform — MPT optimisation, live PSX data,
@@ -374,7 +374,7 @@ export default function Landing() {
             </h2>
             <p className="font-sans text-[16px] leading-[1.6] text-ink-soft max-w-lg">
               Modern investors demand smart, low-touch tools for goal-based planning, portfolio rebalancing,
-              and risk analysis. Asaas automates investment guidance and asset allocation without the complexity.
+              and risk analysis. Asaasa automates investment guidance and asset allocation without the complexity.
             </p>
             <Link to="/try" className="mt-2">
               <Button variant="primary" size="md" className="px-6 gap-2 font-mono uppercase tracking-[0.06em] text-[13px]">
@@ -480,7 +480,7 @@ export default function Landing() {
           <div className="text-center mb-12">
             <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-jade font-semibold">Simple process</span>
             <h2 className="font-display text-[32px] md:text-[40px] font-semibold text-ink leading-[1.1] mt-3">
-              How Asaas Works
+              How Asaasa Works
             </h2>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -504,7 +504,7 @@ export default function Landing() {
       <section className="px-6 py-16 border-b border-line">
         <div className="max-w-6xl mx-auto">
           <div className="text-center mb-12">
-            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-gold font-semibold">Why Asaas</span>
+            <span className="font-mono text-[11px] uppercase tracking-[0.18em] text-gold font-semibold">Why Asaasa</span>
             <h2 className="font-display text-[32px] md:text-[40px] font-semibold text-ink leading-[1.1] mt-3">
               Built for Pakistan
             </h2>
@@ -593,7 +593,7 @@ export default function Landing() {
       <footer className="border-t border-line px-6 py-6">
         <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <img src="/logo.png" alt="Asaas" className="h-6 w-auto" />
+            <img src="/logo.png" alt="Asaasa" className="h-6 w-auto" />
             <span className="font-display text-[14px] font-semibold text-ink">اثاثہ</span>
             <span className="font-mono text-[10px] uppercase tracking-[0.14em] text-ink-faint">Pakistan Capital Markets</span>
           </div>

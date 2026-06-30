@@ -8,7 +8,7 @@ interface ChatReplyCardProps {
 
 export function ChatReplyCard({ text }: ChatReplyCardProps) {
   return (
-    <CardShell eyebrow="Asaas" accentColor={ACCENT}>
+    <CardShell eyebrow="Asaasa" accentColor={ACCENT}>
       <p className="text-[16px] leading-[1.6] text-ink whitespace-pre-wrap">{text}</p>
     </CardShell>
   )

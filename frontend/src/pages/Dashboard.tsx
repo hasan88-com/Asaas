@@ -11,7 +11,6 @@ import {
 import { PerformanceLine } from '@/components/charts/PerformanceLine'
 import { AllocationDonut } from '@/components/charts/AllocationDonut'
 import { FlagCard } from '@/components/layout/FlagCard'
-import { DashboardChatComposer } from '@/components/layout/DashboardChatComposer'
 import { MyActivity } from '@/components/layout/MyActivity'
 import { MarketSentimentGauge } from '@/components/layout/MarketSentimentGauge'
 import { RiskPanel } from '@/components/layout/RiskPanel'
@@ -566,8 +565,6 @@ export default function Dashboard() {
           )}
         </aside>
       </div>
-
-      <DashboardChatComposer />
     </div>
   )
 }

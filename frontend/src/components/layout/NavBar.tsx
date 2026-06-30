@@ -1,7 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 import {
   LayoutDashboard,
-  MessageCircle,
   Newspaper,
   AlertTriangle,
   Settings,
@@ -19,7 +18,6 @@ interface NavItem {
 const NAV_ITEMS: NavItem[] = [
   { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/strategies', label: 'Strategies', icon: Sparkles },
-  { to: '/chat', label: 'Chat', icon: MessageCircle },
   { to: '/news', label: 'News', icon: Newspaper },
   { to: '/debt-market', label: 'Debt', icon: BarChart3 },
   { to: '/flags', label: 'Flags', icon: AlertTriangle },

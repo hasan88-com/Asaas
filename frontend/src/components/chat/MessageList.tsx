@@ -35,7 +35,7 @@ export function MessageList({ messages, activeTool, onChipClick, chips }: Messag
           </p>
           <div className="flex items-center gap-2">
             <span className="h-px w-6 bg-jade/30" />
-            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-jade/60">Asaas</span>
+            <span className="font-mono text-[9px] uppercase tracking-[0.2em] text-jade/60">Asaasa</span>
             <span className="h-px w-6 bg-jade/30" />
           </div>
           <p className="font-sans text-[15px] text-ink-soft mt-1 max-w-xs">

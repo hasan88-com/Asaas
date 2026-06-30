@@ -57,7 +57,7 @@ export default function Register() {
     <div className="min-h-screen bg-paper flex flex-col items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="flex items-center justify-center gap-2 mb-8">
-          <img src="/logo.png" alt="Asaas" className="h-10 w-auto" />
+          <img src="/logo.png" alt="Asaasa" className="h-10 w-auto" />
           <span className="font-display text-[24px] font-semibold text-ink">اثاثہ</span>
         </div>
 

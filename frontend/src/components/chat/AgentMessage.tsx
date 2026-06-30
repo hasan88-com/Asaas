@@ -12,7 +12,7 @@ const ROLE_LABEL: Record<string, string> = {
   rate_impact: 'RATE IMPACT',
   valuation: 'VALUATION',
   technical: 'TECHNICAL',
-  chat: 'ASAAS',
+  chat: 'Raabta AI',
 }
 
 const ROLE_COLOR: Record<string, string> = {
@@ -49,7 +49,7 @@ export function AgentMessage({ message, showRoleLabel, activeTool }: AgentMessag
   }, [reduced])
 
   const accentColor = ROLE_COLOR[message.agentRole] ?? '#0F6E56'
-  const roleLabel = ROLE_LABEL[message.agentRole] ?? 'ASAAS'
+  const roleLabel = ROLE_LABEL[message.agentRole] ?? 'Raabta AI'
 
   return (
     <div ref={ref} className="flex flex-col gap-1.5 max-w-[80%]">

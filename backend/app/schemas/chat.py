@@ -15,6 +15,19 @@ from pydantic import BaseModel, Field
 
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, description="Message to the agent")
+    conversation_id: Optional[UUID] = Field(
+        None, description="Thread to append to; a new one is created when omitted"
+    )
+
+
+class ConversationResponse(BaseModel):
+    id: UUID
+    title: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
 
 
 class ChatMessageResponse(BaseModel):

@@ -39,11 +39,11 @@ export default function Login() {
     <div className="min-h-screen bg-paper flex">
       <div className="hidden lg:flex lg:w-1/2 bg-jade flex-col items-center justify-center p-12 text-center">
         <div className="flex flex-col items-center gap-4 max-w-sm">
-          <img src="/logo.png" alt="Asaas" className="h-20 w-auto" />
+          <img src="/logo.png" alt="Asaasa" className="h-20 w-auto" />
           <span className="font-display text-[36px] font-semibold text-white leading-[1.05]">اثاثہ</span>
           <div className="flex items-center gap-2">
             <span className="h-px w-8 bg-white/30" />
-            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 font-semibold">Asaas</span>
+            <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/70 font-semibold">Asaasa</span>
             <span className="h-px w-8 bg-white/30" />
           </div>
           <p className="font-sans text-[16px] leading-[1.5] text-white/80 mt-2">
@@ -55,7 +55,7 @@ export default function Login() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           <div className="flex items-center justify-center gap-2 mb-8 lg:hidden">
-            <img src="/logo.png" alt="Asaas" className="h-10 w-auto" />
+            <img src="/logo.png" alt="Asaasa" className="h-10 w-auto" />
             <span className="font-display text-[24px] font-semibold text-ink">اثاثہ</span>
           </div>
 
