@@ -478,15 +478,27 @@ export async function analyzeGuest(
   const url = `${BASE}/portfolio/analyze-guest`
   let res: Response
   try {
-    res = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ holdings }),
-    })
-  } catch (netErr) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 90_000) // 90s for cold start
+    try {
+      res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ holdings }),
+        signal: controller.signal,
+      })
+    } finally {
+      clearTimeout(timeoutId)
+    }
+  } catch (netErr: unknown) {
+    const isTimeout = netErr instanceof Error && netErr.name === 'AbortError'
     throw Object.assign(
-      new Error(`Cannot reach server at ${url}. Is the backend running?`),
+      new Error(
+        isTimeout
+          ? 'The server is waking up from sleep — please wait a moment and try again.'
+          : `Cannot reach server at ${url}. Is the backend running?`,
+      ),
       { status: 0 },
     )
   }

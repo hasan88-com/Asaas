@@ -179,11 +179,14 @@ async def lifespan(app: FastAPI):
     try:
         import asyncio as _asyncio
         from app.workers.backfill_prices import run_backfill_prices, prices_table_is_sparse
+        from app.workers.backfill_snapshots import run_backfill_snapshots
 
         async def _maybe_backfill():
             if await prices_table_is_sparse():
                 logger.info("prices table is sparse — kicking off historical backfill")
                 await run_backfill_prices()
+            # Always backfill snapshots on boot so existing portfolios get chart history
+            await run_backfill_snapshots()
 
         _asyncio.create_task(_maybe_backfill())
     except Exception as _bf_err:

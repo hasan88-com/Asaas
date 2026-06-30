@@ -294,19 +294,65 @@ export default function Dashboard() {
         {/* LEFT */}
         <div className="flex flex-col gap-5">
 
-          {/* Performance chart card — always rendered */}
-          <div className="bg-card border border-line rounded-[10px] p-4">
-            <div className="flex items-center justify-between mb-3">
-              <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">Performance</p>
-              <div className="flex gap-1">
+          {/* Performance chart card */}
+          <div className="relative overflow-hidden rounded-2xl border border-white/[0.06] bg-[#0C1612] p-5">
+            {/* subtle radial glow behind the chart */}
+            <div
+              className="pointer-events-none absolute inset-0"
+              style={{
+                background: isGain
+                  ? 'radial-gradient(ellipse 70% 50% at 50% 110%, rgba(16,207,170,0.08) 0%, transparent 70%)'
+                  : 'radial-gradient(ellipse 70% 50% at 50% 110%, rgba(255,107,107,0.07) 0%, transparent 70%)',
+              }}
+            />
+
+            {/* header row */}
+            <div className="relative flex items-start justify-between mb-4">
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[10px] uppercase tracking-[0.2em] text-white/30 font-mono">Portfolio Value</span>
+                {!perfReady ? (
+                  <Skel className="h-8 w-32 mt-1" />
+                ) : (
+                  <div className="flex items-end gap-3 mt-0.5">
+                    <span className="font-mono text-[28px] font-semibold text-white tabular-nums leading-none">
+                      {totalValue !== null ? formatPkrFull(totalValue) : '—'}
+                    </span>
+                    {pnlPct !== null && (
+                      <span className={cn(
+                        'mb-0.5 font-mono text-[12px] font-medium px-2 py-0.5 rounded-full',
+                        isGain
+                          ? 'text-[#10CFAA] bg-[#10CFAA]/10'
+                          : 'text-[#FF6B6B] bg-[#FF6B6B]/10',
+                      )}>
+                        {isGain ? '+' : ''}{(pnlPct * 100).toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                )}
+                {!perfReady ? (
+                  <Skel className="h-3 w-24 mt-1" />
+                ) : pnlAbs !== null ? (
+                  <span className={cn(
+                    'font-mono text-[11px] mt-1',
+                    isGain ? 'text-[#10CFAA]/70' : 'text-[#FF6B6B]/70',
+                  )}>
+                    {isGain ? '+' : ''}{formatPkr(pnlAbs)} total P&amp;L
+                  </span>
+                ) : null}
+              </div>
+
+              {/* time range pills */}
+              <div className="flex gap-1 bg-white/[0.04] rounded-lg p-1">
                 {TIME_RANGES.map((tr) => (
                   <button
                     key={tr}
                     type="button"
                     onClick={() => setTimeRange(tr)}
                     className={cn(
-                      'px-2.5 py-1 rounded font-mono text-[10px] uppercase tracking-[0.1em] transition-all duration-150 btn-press',
-                      timeRange === tr ? 'bg-jade text-white' : 'text-ink-faint hover:text-ink hover:bg-line-soft',
+                      'px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-[0.08em] transition-all duration-150',
+                      timeRange === tr
+                        ? 'bg-[#10CFAA]/20 text-[#10CFAA] shadow-sm'
+                        : 'text-white/25 hover:text-white/50',
                     )}
                   >
                     {tr}
@@ -315,33 +361,23 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {!perfReady ? (
-              <Skel className="h-[260px] w-full" />
-            ) : visibleHistory.length > 1 ? (
-              <PerformanceLine history={visibleHistory} height={260} lineColor="#0F6E56" />
-            ) : (
-              <div className="flex items-center justify-center" style={{ height: 260 }}>
-                <p className="font-mono text-[12px] text-ink-faint text-center">
-                  {perf && perf.history.length > 0
-                    ? 'Building history — your portfolio value is snapshotted daily.'
-                    : 'No performance data yet'}
-                </p>
-              </div>
-            )}
+            {/* chart */}
+            <div className="relative">
+              {!perfReady ? (
+                <Skel className="h-[240px] w-full rounded-xl" />
+              ) : (
+                <PerformanceLine
+                  history={visibleHistory}
+                  height={240}
+                  lineColor="#10CFAA"
+                  isPositive={isGain}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Stats row — always rendered; values fill in when ready */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <StatCell
-              label="Total P&L"
-              value={!perfReady ? '—' : pnlAbs !== null ? formatPkr(pnlAbs) : '—'}
-              positive={perfReady && pnlAbs !== null ? isGain : undefined}
-            />
-            <StatCell
-              label="Return"
-              value={!perfReady ? '—' : pnlPct !== null ? `${pnlPct >= 0 ? '+' : ''}${(pnlPct * 100).toFixed(2)}%` : '—'}
-              positive={perfReady && pnlPct !== null ? pnlPct >= 0 : undefined}
-            />
+          {/* Stats row */}
+          <div className="grid grid-cols-2 gap-3">
             <StatCell
               label="Expected p.a."
               value={!portfolioReady ? '—' : portfolio ? `${(parseFloat(portfolio.expected_return) * 100).toFixed(1)}%` : '—'}
@@ -349,7 +385,7 @@ export default function Dashboard() {
               sub={portfolio?.risk_free_rate ? `SBP ${(parseFloat(portfolio.risk_free_rate) * 100).toFixed(2)}%` : undefined}
             />
             <StatCell
-              label="Sharpe"
+              label="Sharpe Ratio"
               value={!portfolioReady ? '—' : portfolio ? parseFloat(portfolio.sharpe).toFixed(2) : '—'}
               positive={portfolioReady && portfolio ? parseFloat(portfolio.sharpe) > 1 : undefined}
             />
