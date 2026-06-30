@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
@@ -18,54 +19,6 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 logger = logging.getLogger("asaas.services.valuation")
-
-# In-process TTL cache for yfinance ticker data (info, cashflow, balance_sheet).
-# Avoids repeated Yahoo Finance hits within a single deployment process.
-# TTL = 1 hour; keyed by upper-case symbol.
-_YF_CACHE: Dict[str, Any] = {}
-_YF_CACHE_TTL = 3600.0
-
-
-def _yf_cache_get(key: str) -> Optional[Any]:
-    import time
-    entry = _YF_CACHE.get(key)
-    if entry and time.monotonic() - entry["ts"] < _YF_CACHE_TTL:
-        return entry["data"]
-    return None
-
-
-def _yf_cache_set(key: str, data: Any) -> None:
-    import time
-    _YF_CACHE[key] = {"ts": time.monotonic(), "data": data}
-
-
-async def _yf_get_info(symbol: str) -> Dict[str, Any]:
-    """Fetch yfinance .info with in-process caching."""
-    import yfinance as yf
-    key = f"info:{symbol.upper()}"
-    cached = _yf_cache_get(key)
-    if cached is not None:
-        return cached
-    data = await asyncio.to_thread(lambda: yf.Ticker(symbol).info)
-    _yf_cache_set(key, data)
-    return data
-
-
-async def _yf_get_fundamentals(symbol: str):
-    """Fetch yfinance cashflow + balance_sheet + info with in-process caching."""
-    import yfinance as yf
-    key = f"fundamentals:{symbol.upper()}"
-    cached = _yf_cache_get(key)
-    if cached is not None:
-        return cached
-
-    def _fetch():
-        t = yf.Ticker(symbol)
-        return t.cashflow, t.balance_sheet, t.info
-
-    data = await asyncio.to_thread(_fetch)
-    _yf_cache_set(key, data)
-    return data
 
 _EQUITY_RISK_PREMIUM = Decimal("0.1635")  # Pakistan total ERP — Damodaran (Caa2):
 # 12.02% country risk premium + 4.33% mature-market premium. Among the world's
@@ -115,6 +68,111 @@ def _to_decimal(value: Any) -> Optional[Decimal]:
 
 def _safe_info(info: Dict[str, Any], key: str) -> Optional[Decimal]:
     return _to_decimal(info.get(key))
+
+
+# --- Shared fundamentals fetch (one yfinance round-trip per symbol, cached) ----
+#
+# A single valuation previously fired 5-6 separate yfinance fetches (info in
+# extract_company_info, cashflow+balance+info in run_dcf, info again in
+# run_monte_carlo, info in run_multiples). Yahoo throttles repeated calls to
+# EMPTY DataFrames, which surfaced as "insufficient cash-flow history". We now
+# fetch info + income_stmt + cashflow + balance_sheet ONCE and share the bundle.
+_FUNDAMENTALS_TTL = 900  # seconds (15 min)
+_fundamentals_cache: Dict[str, Dict[str, Any]] = {}  # symbol -> bundle
+
+
+def _df_empty(df: Any) -> bool:
+    return df is None or getattr(df, "empty", True)
+
+
+async def _yf_get_fundamentals(symbol: str) -> Dict[str, Any]:
+    """Fetch and cache ``{info, income, cashflow, balance, fetched_at, stale}``.
+
+    One round-trip per symbol; results cached for ``_FUNDAMENTALS_TTL``. When a
+    fetch comes back throttled/empty we serve the last-known-good bundle (flagged
+    ``stale``) if we have one, and never cache an empty result (so the next call
+    retries). Never raises.
+    """
+    now = time.time()
+    cached = _fundamentals_cache.get(symbol)
+    if cached and (now - cached["fetched_at"]) < _FUNDAMENTALS_TTL:
+        return cached
+
+    info: Optional[Dict[str, Any]] = None
+    income = cashflow = balance = None
+    try:
+        import yfinance as yf
+
+        def _fetch():
+            t = yf.Ticker(symbol)
+            return t.info, t.income_stmt, t.cashflow, t.balance_sheet
+
+        info, income, cashflow, balance = await asyncio.to_thread(_fetch)
+    except Exception as exc:
+        logger.warning("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
+
+    info = info or {}
+    has_price = (
+        info.get("regularMarketPrice") is not None
+        or info.get("currentPrice") is not None
+    )
+    looks_empty = (
+        not has_price
+        and _df_empty(income)
+        and _df_empty(cashflow)
+        and _df_empty(balance)
+    )
+
+    if looks_empty:
+        if cached:
+            logger.info("yfinance throttled for %s — serving last-known-good fundamentals.", symbol)
+            stale = dict(cached)
+            stale["stale"] = True
+            return stale
+        # Nothing cached and nothing fetched — return uncached so we retry next call.
+        return {
+            "info": info, "income": income, "cashflow": cashflow,
+            "balance": balance, "fetched_at": now, "stale": True,
+        }
+
+    bundle = {
+        "info": info, "income": income, "cashflow": cashflow,
+        "balance": balance, "fetched_at": now, "stale": False,
+    }
+    _fundamentals_cache[symbol] = bundle
+    return bundle
+
+
+def _yf_equity_symbol(symbol: str) -> str:
+    """PSX tickers on yfinance need the ``.KA`` suffix — a bare ticker silently
+    resolves to a *different* (often foreign) company. Append it when missing.
+    Only used on the equity path; crypto/commodity never reach here."""
+    s = symbol.strip().upper()
+    if "." in s or "-" in s or "=" in s:
+        return s
+    return f"{s}.KA"
+
+
+def _find_row(df: Any, *keywords: str) -> Optional[Decimal]:
+    """Most-recent non-NaN value of the first statement row whose label contains
+    any of ``keywords`` (case-insensitive substring). yfinance orders statement
+    columns newest-first, so ``iloc[0]`` is the latest fiscal period.
+
+    Replaces brittle exact-label matching — yfinance row labels vary by ticker
+    (e.g. "Operating Cash Flow" vs "Total Cash From Operating Activities").
+    """
+    if _df_empty(df):
+        return None
+    try:
+        for idx in df.index:
+            label = str(idx).lower()
+            if any(kw.lower() in label for kw in keywords):
+                vals = df.loc[idx].dropna()
+                if not vals.empty:
+                    return _to_decimal(vals.iloc[0])
+    except Exception as exc:
+        logger.debug("_find_row(%s) failed: %s", keywords, exc)
+    return None
 
 
 async def compute_beta(symbol: str, db=None) -> Optional[Decimal]:
@@ -171,14 +229,15 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
     Returns a dict with a 'missing_fields' list for any absent data.
     Never raises — returns {'error': '...'} on total failure.
     """
-    try:
-        info = await _yf_get_info(symbol)
-    except Exception as exc:
-        logger.error("yfinance info fetch failed for %s: %s", symbol, exc)
-        return {"symbol": symbol, "error": f"Could not fetch data: {exc}", "missing_fields": []}
+    bundle = await _yf_get_fundamentals(symbol)
+    info = bundle.get("info") or {}
 
-    if not info or info.get("regularMarketPrice") is None and info.get("currentPrice") is None:
+    if info.get("regularMarketPrice") is None and info.get("currentPrice") is None:
         return {"symbol": symbol, "error": "No data returned by yfinance", "missing_fields": []}
+
+    # Statement-derived ratios fill the gaps yfinance leaves for PSX `.KA`
+    # (trailingEps/enterpriseToEbitda are absent there).
+    derived = _subject_ratios(bundle)
 
     fields = {
         "name": info.get("longName") or info.get("shortName"),
@@ -189,10 +248,10 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
         "current_price": _to_decimal(info.get("currentPrice") or info.get("regularMarketPrice")),
         "market_cap": _to_decimal(info.get("marketCap")),
         "shares_outstanding": _to_decimal(info.get("sharesOutstanding")),
-        "trailing_pe": _to_decimal(info.get("trailingPE")),
-        "forward_pe": _to_decimal(info.get("forwardPE")),
-        "price_to_book": _to_decimal(info.get("priceToBook")),
-        "ev_to_ebitda": _to_decimal(info.get("enterpriseToEbitda")),
+        "trailing_pe": _to_decimal(info.get("trailingPE")) or derived["pe"],
+        "forward_pe": _to_decimal(info.get("forwardPE")) or derived["forward_pe"],
+        "price_to_book": _to_decimal(info.get("priceToBook")) or derived["pb"],
+        "ev_to_ebitda": _to_decimal(info.get("enterpriseToEbitda")) or derived["ev_ebitda"],
         "beta": _to_decimal(info.get("beta")),
         "dividend_yield": _to_decimal(info.get("dividendYield")),
         "return_on_equity": _to_decimal(info.get("returnOnEquity")),
@@ -228,45 +287,38 @@ async def run_dcf(
     Never fabricates cash flows or growth rates.
     """
     assumptions = assumptions or {}
+    symbol = _yf_equity_symbol(symbol)
 
-    try:
-        cashflow, balance_sheet, info = await _yf_get_fundamentals(symbol)
-    except Exception as exc:
-        logger.error("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
-        return {"insufficient_data": True, "reason": f"Could not fetch fundamentals: {exc}"}
+    bundle = await _yf_get_fundamentals(symbol)
+    info = bundle.get("info") or {}
+    cashflow = bundle.get("cashflow")
+    balance_sheet = bundle.get("balance")
+    income = bundle.get("income")
 
-    # Extract Free Cash Flow = Operating CF - CapEx
-    try:
-        op_cf = None
-        capex = None
-        if cashflow is not None and not cashflow.empty:
-            for label in ("Operating Cash Flow", "Total Cash From Operating Activities"):
-                if label in cashflow.index:
-                    vals = cashflow.loc[label].dropna()
-                    if not vals.empty:
-                        op_cf = _to_decimal(vals.iloc[0])
-                        break
-            for label in ("Capital Expenditure", "Capital Expenditures"):
-                if label in cashflow.index:
-                    vals = cashflow.loc[label].dropna()
-                    if not vals.empty:
-                        capex = _to_decimal(vals.iloc[0])
-                        break
-    except Exception as exc:
-        logger.warning("Cash flow parsing error for %s: %s", symbol, exc)
-        op_cf = None
-        capex = None
+    # Free Cash Flow: prefer the explicit FCF row → else Operating CF + CapEx
+    # (capex is negative) → else Net Income as a proxy (flagged via fcf_source).
+    fcf_source = "free_cash_flow"
+    fcf = _find_row(cashflow, "free cash flow")
+    if fcf is None:
+        op_cf = _find_row(cashflow, "operating cash flow", "cash from operating")
+        if op_cf is not None:
+            capex = _find_row(cashflow, "capital expenditure") or Decimal("0")
+            fcf = op_cf + capex
+            fcf_source = "operating_cf_minus_capex"
+    if fcf is None:
+        net_income = _find_row(income, "net income from continuing operation", "net income")
+        if net_income is not None:
+            fcf = net_income
+            fcf_source = "net_income_proxy"
 
-    if op_cf is None:
+    if fcf is None:
         return {
             "insufficient_data": True,
             "reason": (
-                "yfinance does not publish free cash flow data for this ticker. "
-                "PSX fundamentals are often unavailable via this source."
+                "No cash-flow or net-income data available from yfinance for this "
+                "ticker right now (the source may be rate-limiting — try again)."
             ),
         }
-
-    fcf = op_cf + (capex or Decimal("0"))  # capex is typically negative
 
     # Shares outstanding
     shares = _to_decimal(info.get("sharesOutstanding")) or _SHARES_FALLBACK
@@ -304,28 +356,10 @@ async def run_dcf(
 
     enterprise_value = pv_total + pv_terminal
 
-    # Subtract net debt if available
-    net_debt = Decimal("0")
-    try:
-        if balance_sheet is not None and not balance_sheet.empty:
-            total_debt = None
-            cash = None
-            for label in ("Total Debt", "Long Term Debt"):
-                if label in balance_sheet.index:
-                    vals = balance_sheet.loc[label].dropna()
-                    if not vals.empty:
-                        total_debt = _to_decimal(vals.iloc[0])
-                        break
-            for label in ("Cash And Cash Equivalents", "Cash"):
-                if label in balance_sheet.index:
-                    vals = balance_sheet.loc[label].dropna()
-                    if not vals.empty:
-                        cash = _to_decimal(vals.iloc[0])
-                        break
-            if total_debt is not None and cash is not None:
-                net_debt = total_debt - cash
-    except Exception:
-        pass
+    # Subtract net debt = total debt − cash (fuzzy row match; missing → 0).
+    total_debt = _find_row(balance_sheet, "total debt", "long term debt")
+    cash = _find_row(balance_sheet, "cash and cash equivalents")
+    net_debt = (total_debt or Decimal("0")) - (cash or Decimal("0"))
 
     equity_value = enterprise_value - net_debt
     intrinsic_value_per_share = equity_value / shares if shares > 0 else Decimal("0")
@@ -338,8 +372,12 @@ async def run_dcf(
         "risk_free_rate": str(risk_free.quantize(Decimal("0.0001"))),
         "risk_free_is_placeholder": rf_placeholder,
         "growth_rate": str(growth_rate.quantize(Decimal("0.0001"))),
+        # Both keys: `terminal_growth` (legacy) + `terminal_growth_rate` (frontend type).
         "terminal_growth": str(terminal_growth.quantize(Decimal("0.0001"))),
+        "terminal_growth_rate": str(terminal_growth.quantize(Decimal("0.0001"))),
         "fcf_base": str(fcf.quantize(Decimal("1"))),
+        "fcf_source": fcf_source,
+        "stale": bool(bundle.get("stale")),
         "shares_outstanding": str(shares.quantize(Decimal("1"))),
         "assumptions": {
             "beta": str(beta),
@@ -364,12 +402,7 @@ async def run_monte_carlo(
     # Get base DCF to check data availability and get FCF
     base = await run_dcf(symbol)
     if base.get("insufficient_data"):
-        return base  # propagate the insufficient_data flag
-
-    try:
-        info = await _yf_get_info(symbol)
-    except Exception:
-        info = {}
+        return base  # propagate the insufficient_data flag (shares the cached bundle)
 
     try:
         fcf = Decimal(base["fcf_base"])
@@ -423,6 +456,7 @@ async def run_monte_carlo(
             "mean": str(mean),
             "std": str(std),
             "n_simulations": n,
+            "num_simulations": n,  # frontend MonteCarloResult key
             "ranges": {
                 "growth": [g_lo, g_hi],
                 "wacc": [round(w_lo, 4), round(w_hi, 4)],
@@ -435,42 +469,112 @@ async def run_monte_carlo(
         return {"insufficient_data": True, "reason": f"Monte Carlo simulation failed: {exc}"}
 
 
+def _subject_ratios(bundle: Dict[str, Any]) -> Dict[str, Optional[Decimal]]:
+    """Compute P/E, forward P/E, EV/EBITDA, P/B, P/S from a fundamentals bundle.
+
+    ``info`` is used first; anything yfinance omits (common for PSX `.KA` —
+    trailingEps, enterpriseValue, ebitda are all absent) is derived from the
+    financial statements. Genuinely uncomputable values stay ``None``.
+    """
+    info = bundle.get("info") or {}
+    income = bundle.get("income")
+    balance = bundle.get("balance")
+
+    price = _to_decimal(info.get("currentPrice") or info.get("regularMarketPrice"))
+    shares = _to_decimal(info.get("sharesOutstanding"))
+    market_cap = _to_decimal(info.get("marketCap"))
+    if market_cap is None and price is not None and shares is not None:
+        market_cap = price * shares
+
+    # P/E — info.trailingPE → price / EPS (EPS = net income / shares); skip if earnings ≤ 0.
+    pe = _to_decimal(info.get("trailingPE"))
+    if pe is None and price is not None and shares and shares > 0:
+        net_income = _find_row(income, "net income from continuing operation", "net income")
+        if net_income is not None and net_income > 0:
+            eps = net_income / shares
+            if eps > 0:
+                pe = price / eps
+    forward_pe = _to_decimal(info.get("forwardPE"))
+
+    # P/B — info.priceToBook → price / bookValue → price / (equity per share).
+    pb = _to_decimal(info.get("priceToBook"))
+    if pb is None and price is not None:
+        book = _to_decimal(info.get("bookValue"))
+        if book is not None and book > 0:
+            pb = price / book
+        elif shares and shares > 0:
+            equity = _find_row(balance, "stockholders equity", "total equity")
+            if equity is not None and equity > 0:
+                pb = price / (equity / shares)
+
+    # EV/EBITDA — info.enterpriseToEbitda → (marketCap + totalDebt − cash) / EBITDA.
+    # None when there's no EBITDA (e.g. banks) — correct, not an error.
+    ev_ebitda = _to_decimal(info.get("enterpriseToEbitda"))
+    if ev_ebitda is None and market_cap is not None:
+        ebitda = _find_row(income, "normalized ebitda", "ebitda")
+        if ebitda is not None and ebitda > 0:
+            total_debt = _find_row(balance, "total debt") or Decimal("0")
+            cash = _find_row(balance, "cash and cash equivalents") or Decimal("0")
+            ev_ebitda = (market_cap + total_debt - cash) / ebitda
+
+    # P/S — info → marketCap / revenue.
+    ps = _to_decimal(info.get("priceToSalesTrailing12Months"))
+    if ps is None and market_cap is not None:
+        revenue = _find_row(income, "total revenue", "operating revenue")
+        if revenue is not None and revenue > 0:
+            ps = market_cap / revenue
+
+    return {"pe": pe, "forward_pe": forward_pe, "ev_ebitda": ev_ebitda, "pb": pb, "ps": ps}
+
+
 async def run_multiples(
     symbol: str,
     peers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
     Relative valuation: P/E, EV/EBITDA, P/B for subject vs peers.
-    Missing ratios are set to None — never fabricated.
+
+    Returns the flat shape the frontend ``MultiplesResult`` expects
+    (``pe_ratio`` / ``ev_ebitda`` / ``pb_ratio`` + peer medians). Ratios yfinance
+    omits for PSX `.KA` are computed from the statements (see ``_subject_ratios``);
+    nothing is fabricated. Peer medians are ``None`` unless peers are supplied.
     """
     peers = peers or []
+    symbol = _yf_equity_symbol(symbol)
 
-    async def _fetch_ratios(sym: str) -> Dict[str, Any]:
+    async def _ratios(sym: str) -> Dict[str, Optional[Decimal]]:
+        bundle = await _yf_get_fundamentals(_yf_equity_symbol(sym))
+        return _subject_ratios(bundle)
+
+    subject = await _ratios(symbol)
+    peer_ratios = await asyncio.gather(*[_ratios(p) for p in peers]) if peers else []
+
+    def _median(key: str) -> Optional[Decimal]:
+        vals = sorted(r[key] for r in peer_ratios if r.get(key) is not None)
+        if not vals:
+            return None
+        mid = len(vals) // 2
+        return vals[mid] if len(vals) % 2 else (vals[mid - 1] + vals[mid]) / 2
+
+    def _s(v: Optional[Decimal]) -> Optional[str]:
+        if not isinstance(v, Decimal):
+            return None
         try:
-            info = await _yf_get_info(sym)
-            return {
-                "symbol": sym,
-                "pe": _to_decimal(info.get("trailingPE")),
-                "forward_pe": _to_decimal(info.get("forwardPE")),
-                "ev_ebitda": _to_decimal(info.get("enterpriseToEbitda")),
-                "pb": _to_decimal(info.get("priceToBook")),
-                "ps": _to_decimal(info.get("priceToSalesTrailing12Months")),
-            }
-        except Exception as exc:
-            logger.warning("Multiples fetch failed for %s: %s", sym, exc)
-            return {"symbol": sym, "pe": None, "forward_pe": None, "ev_ebitda": None, "pb": None, "ps": None}
-
-    subject_ratios = await _fetch_ratios(symbol)
-    peer_results = await asyncio.gather(*[_fetch_ratios(p) for p in peers])
-
-    def _fmt(d: Dict[str, Any]) -> Dict[str, Any]:
-        return {k: (str(v) if isinstance(v, Decimal) else v) for k, v in d.items()}
+            return str(v.quantize(Decimal("0.01")))
+        except Exception:
+            return str(v)
 
     return {
-        "subject": _fmt(subject_ratios),
-        "peers": [_fmt(p) for p in peer_results],
+        "pe_ratio": _s(subject["pe"]),
+        "forward_pe": _s(subject["forward_pe"]),
+        "ev_ebitda": _s(subject["ev_ebitda"]),
+        "pb_ratio": _s(subject["pb"]),
+        "ps_ratio": _s(subject["ps"]),
+        "peer_pe_median": _s(_median("pe")),
+        "peer_ev_ebitda_median": _s(_median("ev_ebitda")),
+        "peer_pb_median": _s(_median("pb")),
         "missing_note": (
-            "Some ratios may be unavailable for PSX stocks via yfinance."
+            "Ratios yfinance omits for PSX stocks are computed from financial statements."
             if symbol.endswith(".KA") else None
         ),
     }
