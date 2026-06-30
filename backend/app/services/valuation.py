@@ -711,8 +711,12 @@ def _subject_ratios(bundle: Dict[str, Any]) -> Dict[str, Optional[Decimal]]:
         if revenue is not None and revenue > 0:
             ps = market_cap / revenue
 
-    # Trailing EPS — info.trailingEps → net income / shares (for industry-P/E × EPS).
+    # Trailing EPS — info.trailingEps → price / P/E (consistent with the reported
+    # ratio) → net income / shares. The price/PE step avoids the unit mismatch you
+    # get from raw net-income/shares on PSX statements.
     eps = _to_decimal(info.get("trailingEps"))
+    if eps is None and price is not None and pe is not None and pe > 0:
+        eps = price / pe
     if eps is None and shares and shares > 0:
         net_income = _find_row(income, "net income from continuing operation", "net income")
         if net_income is not None:

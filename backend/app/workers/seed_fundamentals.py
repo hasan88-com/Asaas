@@ -25,35 +25,28 @@ from app.services.valuation import _yf_get_fundamentals, _fundamentals_cache
 
 logger = logging.getLogger("asaas.workers.seed_fundamentals")
 
-# PSX large-caps by sector (bare tickers → .KA appended).
-SEED_TICKERS: list[str] = [
-    # Commercial Banks
-    "HBL", "UBL", "MCB", "BAFL", "MEBL", "NBP", "BAHL", "AKBL",
-    # Cement
-    "LUCK", "DGKC", "MLCF", "FCCL", "KOHC", "PIOC", "ACPL",
-    # Oil & Gas Exploration
-    "OGDC", "PPL", "MARI", "POL",
-    # Fertilizer
-    "ENGRO", "FFC", "EFERT", "FATIMA",
-    # Oil & Gas Marketing / Refinery
-    "PSO", "APL", "SHEL", "SNGP", "SSGC", "ATRL", "NRL",
-    # Power
-    "HUBC", "KAPCO", "NPL", "NCPL",
-    # Technology
-    "SYS", "TRG", "NETSOL", "AVN",
-    # Automobile
-    "INDU", "HCAR", "MTL", "PSMC",
-    # Chemicals
-    "EPCL", "ICI", "LOTCHEM", "BERG",
-    # Textile
-    "NML", "ILP", "GATM", "KTML",
-    # Food
-    "NESTLE", "EFOODS", "FFL",
-    # Pharma
-    "SEARL", "AGP", "HINOON", "GLAXO", "ABOT",
-    # Misc large-caps seen in user queries
-    "BBFL", "RMPL",
-]
+# PSX large-caps grouped by sector (bare tickers → .KA appended). We assign the
+# sector from THIS grouping, not yfinance (which omits `sector` for .KA), so the
+# peer-median industry P/E has real same-sector populations.
+SECTOR_MAP: dict[str, list[str]] = {
+    "Commercial Banks": ["HBL", "UBL", "MCB", "BAFL", "MEBL", "NBP", "BAHL", "AKBL"],
+    "Cement": ["LUCK", "DGKC", "MLCF", "FCCL", "KOHC", "PIOC", "ACPL"],
+    "Oil & Gas Exploration Companies": ["OGDC", "PPL", "MARI", "POL"],
+    "Fertilizer": ["ENGRO", "FFC", "EFERT", "FATIMA"],
+    "Oil & Gas Marketing Companies": ["PSO", "APL", "SHEL", "SNGP", "SSGC"],
+    "Refinery": ["ATRL", "NRL"],
+    "Power Generation & Distribution": ["HUBC", "KAPCO", "NPL", "NCPL"],
+    "Technology & Communication": ["SYS", "TRG", "NETSOL", "AVN"],
+    "Automobile Assembler": ["INDU", "HCAR", "MTL", "PSMC"],
+    "Chemical": ["EPCL", "ICI", "LOTCHEM", "BERG"],
+    "Textile Composite": ["NML", "ILP", "GATM", "KTML"],
+    "Food & Personal Care Products": ["NESTLE", "EFOODS", "FFL"],
+    "Pharmaceuticals": ["SEARL", "AGP", "HINOON", "GLAXO", "ABOT"],
+    "Miscellaneous": ["BBFL", "RMPL"],
+}
+# bare ticker -> PSX sector
+TICKER_SECTOR: dict[str, str] = {t: sec for sec, ts in SECTOR_MAP.items() for t in ts}
+SEED_TICKERS: list[str] = list(TICKER_SECTOR.keys())
 
 
 async def _ensure_instrument(db, symbol: str) -> Instrument:
@@ -78,13 +71,14 @@ async def run_seed(tickers: list[str] | None = None, delay: float = 1.0) -> dict
             _fundamentals_cache.pop(sym, None)
             bundle = await _yf_get_fundamentals(sym)  # fetches live + auto-persists
             info = bundle.get("info") or {}
-            sector = info.get("sector")
-            # Populate sector/industry so peer-median industry P/E works.
+            # Assign the curated PSX sector (yfinance omits sector for .KA), so
+            # peer-median industry P/E has real same-sector populations.
+            sector = TICKER_SECTOR.get(base) or info.get("sector")
             if sector:
                 async with async_session_factory() as db:
                     inst = (await db.execute(select(Instrument).where(Instrument.symbol == sym))).scalar_one()
-                    inst.sector = inst.sector or sector
-                    inst.metadata_ = {**(inst.metadata_ or {}), "yf_sector": sector, "yf_industry": info.get("industry")}
+                    inst.sector = sector
+                    inst.metadata_ = {**(inst.metadata_ or {}), "yf_sector": info.get("sector"), "yf_industry": info.get("industry")}
                     await db.commit()
             has = not bundle.get("stale") or bool(info.get("trailingPE"))
             if has:
