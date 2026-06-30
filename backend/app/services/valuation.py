@@ -42,11 +42,12 @@ def _yf_cache_set(key: str, data: Any) -> None:
 async def _yf_get_info(symbol: str) -> Dict[str, Any]:
     """Fetch yfinance .info with in-process caching."""
     import yfinance as yf
-    key = f"info:{symbol.upper()}"
+    yf_sym = _yf_symbol(symbol)
+    key = f"info:{yf_sym.upper()}"
     cached = _yf_cache_get(key)
     if cached is not None:
         return cached
-    data = await asyncio.to_thread(lambda: yf.Ticker(symbol).info)
+    data = await asyncio.to_thread(lambda: yf.Ticker(yf_sym).info)
     _yf_cache_set(key, data)
     return data
 
@@ -54,18 +55,27 @@ async def _yf_get_info(symbol: str) -> Dict[str, Any]:
 async def _yf_get_fundamentals(symbol: str):
     """Fetch yfinance cashflow + balance_sheet + info with in-process caching."""
     import yfinance as yf
-    key = f"fundamentals:{symbol.upper()}"
+    yf_sym = _yf_symbol(symbol)
+    key = f"fundamentals:{yf_sym.upper()}"
     cached = _yf_cache_get(key)
     if cached is not None:
         return cached
 
     def _fetch():
-        t = yf.Ticker(symbol)
+        t = yf.Ticker(yf_sym)
         return t.cashflow, t.balance_sheet, t.info
 
     data = await asyncio.to_thread(_fetch)
     _yf_cache_set(key, data)
     return data
+
+def _yf_symbol(symbol: str) -> str:
+    """Convert internal PSX symbol (HBL.KA) to Yahoo Finance ticker (HBL.KAR)."""
+    s = symbol.strip()
+    if s.upper().endswith(".KA"):
+        return s[:-3] + ".KAR"
+    return s
+
 
 _EQUITY_RISK_PREMIUM = Decimal("0.1635")  # Pakistan total ERP — Damodaran (Caa2):
 # 12.02% country risk premium + 4.33% mature-market premium. Among the world's
@@ -146,16 +156,18 @@ async def compute_beta(symbol: str, db=None) -> Optional[Decimal]:
     try:
         import yfinance as yf
 
+        yf_sym = _yf_symbol(symbol)
+
         def _hist():
-            return yf.download([symbol, "^KSE"], period="1y", progress=False, auto_adjust=True)["Close"]
+            return yf.download([yf_sym, "^KSE"], period="1y", progress=False, auto_adjust=True)["Close"]
 
         df = await asyncio.to_thread(_hist)
-        if df is None or df.empty or symbol not in df.columns or "^KSE" not in df.columns:
+        if df is None or df.empty or yf_sym not in df.columns or "^KSE" not in df.columns:
             return None
-        rets = df[[symbol, "^KSE"]].pct_change().dropna()
+        rets = df[[yf_sym, "^KSE"]].pct_change().dropna()
         if len(rets) < 30:
             return None
-        cov = np.cov(rets[symbol].to_numpy(), rets["^KSE"].to_numpy())
+        cov = np.cov(rets[yf_sym].to_numpy(), rets["^KSE"].to_numpy())
         var_m = float(cov[1][1])
         if var_m == 0:
             return None
@@ -491,7 +503,7 @@ async def run_market_comparison(symbol: str) -> Dict[str, Any]:
     30/90-day moving averages and the 52-week range. Real values only — returns
     insufficient_data when price history is unavailable (never fabricates).
     """
-    yf_symbol = _CRYPTO_YF_TICKER.get(symbol.upper(), symbol)
+    yf_symbol = _CRYPTO_YF_TICKER.get(symbol.upper(), _yf_symbol(symbol))
     try:
         import yfinance as yf
 
