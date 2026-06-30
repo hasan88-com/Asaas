@@ -79,6 +79,12 @@ def _safe_info(info: Dict[str, Any], key: str) -> Optional[Decimal]:
 # fetch info + income_stmt + cashflow + balance_sheet ONCE and share the bundle.
 _FUNDAMENTALS_TTL = 900  # seconds (15 min)
 _fundamentals_cache: Dict[str, Dict[str, Any]] = {}  # symbol -> bundle
+# Per-symbol fetch lock: a single valuation fires 4 concurrent calls
+# (company-info, DCF, Monte-Carlo, multiples). Without a lock they all miss the
+# cache at once and hit Yahoo simultaneously → some get 429'd (so DCF can
+# succeed while multiples come back empty). The lock collapses them into ONE
+# fetch that all four then share.
+_fetch_locks: Dict[str, "asyncio.Lock"] = {}
 
 
 def _df_empty(df: Any) -> bool:
@@ -98,6 +104,18 @@ async def _yf_get_fundamentals(symbol: str) -> Dict[str, Any]:
     if cached and (now - cached["fetched_at"]) < _FUNDAMENTALS_TTL:
         return cached
 
+    # Dedup concurrent fetches for the same symbol (one Yahoo round-trip, shared).
+    lock = _fetch_locks.setdefault(symbol, asyncio.Lock())
+    async with lock:
+        # Re-check: another coroutine may have populated the cache while we waited.
+        cached = _fundamentals_cache.get(symbol)
+        if cached and (time.time() - cached["fetched_at"]) < _FUNDAMENTALS_TTL:
+            return cached
+        return await _do_fetch_fundamentals(symbol, cached)
+
+
+async def _do_fetch_fundamentals(symbol: str, cached: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+    now = time.time()
     info: Optional[Dict[str, Any]] = None
     income = cashflow = balance = None
     try:
