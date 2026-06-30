@@ -42,12 +42,11 @@ def _yf_cache_set(key: str, data: Any) -> None:
 async def _yf_get_info(symbol: str) -> Dict[str, Any]:
     """Fetch yfinance .info with in-process caching."""
     import yfinance as yf
-    yf_sym = _yf_symbol(symbol)
-    key = f"info:{yf_sym.upper()}"
+    key = f"info:{symbol.upper()}"
     cached = _yf_cache_get(key)
     if cached is not None:
         return cached
-    data = await asyncio.to_thread(lambda: yf.Ticker(yf_sym).info)
+    data = await asyncio.to_thread(lambda: yf.Ticker(symbol).info)
     _yf_cache_set(key, data)
     return data
 
@@ -55,27 +54,19 @@ async def _yf_get_info(symbol: str) -> Dict[str, Any]:
 async def _yf_get_fundamentals(symbol: str):
     """Fetch yfinance cashflow + balance_sheet + info with in-process caching."""
     import yfinance as yf
-    yf_sym = _yf_symbol(symbol)
-    key = f"fundamentals:{yf_sym.upper()}"
+    key = f"fundamentals:{symbol.upper()}"
     cached = _yf_cache_get(key)
     if cached is not None:
         return cached
 
     def _fetch():
-        t = yf.Ticker(yf_sym)
-        return t.cashflow, t.balance_sheet, t.info
+        t = yf.Ticker(symbol)
+        # cashflow: annual; income_stmt: for net income fallback
+        return t.cashflow, t.balance_sheet, t.info, t.income_stmt
 
     data = await asyncio.to_thread(_fetch)
     _yf_cache_set(key, data)
     return data
-
-def _yf_symbol(symbol: str) -> str:
-    """Convert internal PSX symbol (HBL.KA) to Yahoo Finance ticker (HBL.KAR)."""
-    s = symbol.strip()
-    if s.upper().endswith(".KA"):
-        return s[:-3] + ".KAR"
-    return s
-
 
 _EQUITY_RISK_PREMIUM = Decimal("0.1635")  # Pakistan total ERP — Damodaran (Caa2):
 # 12.02% country risk premium + 4.33% mature-market premium. Among the world's
@@ -156,18 +147,16 @@ async def compute_beta(symbol: str, db=None) -> Optional[Decimal]:
     try:
         import yfinance as yf
 
-        yf_sym = _yf_symbol(symbol)
-
         def _hist():
-            return yf.download([yf_sym, "^KSE"], period="1y", progress=False, auto_adjust=True)["Close"]
+            return yf.download([symbol, "^KSE"], period="1y", progress=False, auto_adjust=True)["Close"]
 
         df = await asyncio.to_thread(_hist)
-        if df is None or df.empty or yf_sym not in df.columns or "^KSE" not in df.columns:
+        if df is None or df.empty or symbol not in df.columns or "^KSE" not in df.columns:
             return None
-        rets = df[[yf_sym, "^KSE"]].pct_change().dropna()
+        rets = df[[symbol, "^KSE"]].pct_change().dropna()
         if len(rets) < 30:
             return None
-        cov = np.cov(rets[yf_sym].to_numpy(), rets["^KSE"].to_numpy())
+        cov = np.cov(rets[symbol].to_numpy(), rets["^KSE"].to_numpy())
         var_m = float(cov[1][1])
         if var_m == 0:
             return None
@@ -242,27 +231,57 @@ async def run_dcf(
     assumptions = assumptions or {}
 
     try:
-        cashflow, balance_sheet, info = await _yf_get_fundamentals(symbol)
+        cashflow, balance_sheet, info, income_stmt = await _yf_get_fundamentals(symbol)
     except Exception as exc:
         logger.error("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
         return {"insufficient_data": True, "reason": f"Could not fetch fundamentals: {exc}"}
 
     # Extract Free Cash Flow = Operating CF - CapEx
+    # yfinance index labels vary across versions and markets — try all known variants.
+    _OP_CF_LABELS = (
+        "Operating Cash Flow",
+        "Total Cash From Operating Activities",
+        "Cash Flow From Continuing Operating Activities",
+        "OperatingCashFlow",
+    )
+    _CAPEX_LABELS = (
+        "Capital Expenditure",
+        "Capital Expenditures",
+        "Purchase Of Property Plant And Equipment",
+        "CapitalExpenditure",
+    )
+    _NET_INCOME_LABELS = (
+        "Net Income",
+        "Net Income Common Stockholders",
+        "NetIncome",
+    )
+
     try:
         op_cf = None
         capex = None
         if cashflow is not None and not cashflow.empty:
-            for label in ("Operating Cash Flow", "Total Cash From Operating Activities"):
+            for label in _OP_CF_LABELS:
                 if label in cashflow.index:
                     vals = cashflow.loc[label].dropna()
                     if not vals.empty:
                         op_cf = _to_decimal(vals.iloc[0])
                         break
-            for label in ("Capital Expenditure", "Capital Expenditures"):
+            for label in _CAPEX_LABELS:
                 if label in cashflow.index:
                     vals = cashflow.loc[label].dropna()
                     if not vals.empty:
                         capex = _to_decimal(vals.iloc[0])
+                        break
+
+        # Fallback: use net income from income_stmt as a proxy FCF when
+        # the cashflow statement is absent (common for PSX .KA tickers).
+        if op_cf is None and income_stmt is not None and not income_stmt.empty:
+            for label in _NET_INCOME_LABELS:
+                if label in income_stmt.index:
+                    vals = income_stmt.loc[label].dropna()
+                    if not vals.empty:
+                        op_cf = _to_decimal(vals.iloc[0])
+                        logger.info("DCF for %s: using net income as FCF proxy (no cashflow stmt)", symbol)
                         break
     except Exception as exc:
         logger.warning("Cash flow parsing error for %s: %s", symbol, exc)
@@ -273,8 +292,8 @@ async def run_dcf(
         return {
             "insufficient_data": True,
             "reason": (
-                "yfinance does not publish free cash flow data for this ticker. "
-                "PSX fundamentals are often unavailable via this source."
+                "yfinance does not publish cash flow or income data for this ticker. "
+                "PSX fundamentals are sometimes unavailable — try again later."
             ),
         }
 
@@ -322,13 +341,14 @@ async def run_dcf(
         if balance_sheet is not None and not balance_sheet.empty:
             total_debt = None
             cash = None
-            for label in ("Total Debt", "Long Term Debt"):
+            for label in ("Total Debt", "Long Term Debt", "TotalDebt", "LongTermDebt"):
                 if label in balance_sheet.index:
                     vals = balance_sheet.loc[label].dropna()
                     if not vals.empty:
                         total_debt = _to_decimal(vals.iloc[0])
                         break
-            for label in ("Cash And Cash Equivalents", "Cash"):
+            for label in ("Cash And Cash Equivalents", "Cash", "CashAndCashEquivalents",
+                          "Cash Cash Equivalents And Short Term Investments"):
                 if label in balance_sheet.index:
                     vals = balance_sheet.loc[label].dropna()
                     if not vals.empty:
@@ -460,9 +480,16 @@ async def run_multiples(
     async def _fetch_ratios(sym: str) -> Dict[str, Any]:
         try:
             info = await _yf_get_info(sym)
+            pe = _to_decimal(info.get("trailingPE"))
+            # Compute P/E from price / trailingEps when yfinance omits trailingPE
+            if pe is None:
+                price = _to_decimal(info.get("currentPrice") or info.get("regularMarketPrice"))
+                eps = _to_decimal(info.get("trailingEps"))
+                if price and eps and eps != 0:
+                    pe = (price / eps).quantize(Decimal("0.01"))
             return {
                 "symbol": sym,
-                "pe": _to_decimal(info.get("trailingPE")),
+                "pe": pe,
                 "forward_pe": _to_decimal(info.get("forwardPE")),
                 "ev_ebitda": _to_decimal(info.get("enterpriseToEbitda")),
                 "pb": _to_decimal(info.get("priceToBook")),
@@ -503,7 +530,7 @@ async def run_market_comparison(symbol: str) -> Dict[str, Any]:
     30/90-day moving averages and the 52-week range. Real values only — returns
     insufficient_data when price history is unavailable (never fabricates).
     """
-    yf_symbol = _CRYPTO_YF_TICKER.get(symbol.upper(), _yf_symbol(symbol))
+    yf_symbol = _CRYPTO_YF_TICKER.get(symbol.upper(), symbol)
     try:
         import yfinance as yf
 

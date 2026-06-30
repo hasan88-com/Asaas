@@ -6,7 +6,7 @@ used by the price backfill. Waterfall, each tier fail-open:
 
   1. PSX DPS timeseries  (dps.psx.com.pk EOD JSON — close + volume)
   2. psx-data-reader     (the `psx` package — full OHLCV)
-  3. yfinance .KAR       (last resort, sparse/slow)
+  3. yfinance .KA        (last resort, sparse/slow)
 
 Returns ``[{price_date, open, high, low, close, volume}]`` oldest→newest, all
 Decimals; empty list when every tier fails (never raises). Money = Decimal.
@@ -63,15 +63,15 @@ class PSXAdapter:
             logger.info("PSX history for %s from psx-data-reader (%d bars)", base, len(rows))
             return rows
 
-        # Last resort: yfinance .KAR (Yahoo Finance PSX suffix)
+        # Last resort: yfinance .KA
         try:
             from app.data.adapters.yfinance_adapter import YFinanceAdapter
-            rows = await YFinanceAdapter().fetch_history(f"{base}.KAR", period=f"{years}y")
+            rows = await YFinanceAdapter().fetch_history(f"{base}.KA", period=f"{years}y")
             if rows:
-                logger.info("PSX history for %s from yfinance .KAR (%d bars)", base, len(rows))
+                logger.info("PSX history for %s from yfinance .KA (%d bars)", base, len(rows))
                 return rows
         except Exception as exc:
-            logger.warning("yfinance .KAR fallback failed for %s: %s", base, exc)
+            logger.warning("yfinance .KA fallback failed for %s: %s", base, exc)
 
         logger.warning("No PSX history for %s from any source", base)
         return []
