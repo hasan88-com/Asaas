@@ -355,6 +355,15 @@ export interface MultiplesResult {
   pb_ratio?: string
   peer_pe_median?: string
   peer_ev_ebitda_median?: string
+  // Industry-P/E × EPS relative valuation + instrument metadata
+  eps?: string
+  industry_pe?: string
+  industry_pe_source?: string
+  fair_value?: string
+  verdict?: string | null
+  asset_class?: string | null
+  sector?: string | null
+  current_price?: string
 }
 
 export interface MarketComparisonResult {

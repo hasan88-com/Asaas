@@ -164,8 +164,18 @@ async def _do_fetch_fundamentals(symbol: str, cached: Optional[Dict[str, Any]]) 
         stale = dict(cached); stale["stale"] = True
         return stale
 
-    # Nothing anywhere — return whatever info we have (P/E may still resolve), and
-    # seed it so a later request has something to merge onto.
+    # Last resort: DuckDuckGo web search for P/E / EPS (best-effort, long tail).
+    if not info.get("trailingPE"):
+        try:
+            from app.data.adapters.fundamentals_search_adapter import fetch_fundamentals_via_search
+            ddg = await fetch_fundamentals_via_search(symbol)
+            if ddg:
+                info = {**info, **ddg}
+        except Exception as exc:
+            logger.warning("DuckDuckGo fundamentals fallback failed for %s: %s", symbol, exc)
+
+    # Return whatever info we have (P/E may still resolve), and seed it so a later
+    # request has something to merge onto.
     bundle = {"info": info, "income": income, "cashflow": cashflow, "balance": balance, "fetched_at": now, "stale": True}
     if info:
         await _persist_fundamentals(symbol, bundle)
@@ -398,9 +408,27 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
     # (trailingEps/enterpriseToEbitda are absent there).
     derived = _subject_ratios(bundle)
 
+    # Instrument metadata (asset class + sector) so every "tell me about X" answer
+    # can state what kind of instrument it is — for stocks, commodities, debt, crypto.
+    inst_asset_class = None
+    inst_sector = None
+    if db is not None:
+        try:
+            from sqlalchemy import select as _select
+            from app.models.instrument import Instrument as _Instrument
+            _inst = (await db.execute(
+                _select(_Instrument).where(_Instrument.symbol == symbol.upper())
+            )).scalar_one_or_none()
+            if _inst is not None:
+                inst_asset_class = _inst.asset_class
+                inst_sector = _inst.sector
+        except Exception:
+            pass
+
     fields = {
         "name": info.get("longName") or info.get("shortName"),
-        "sector": info.get("sector"),
+        "asset_class": inst_asset_class,
+        "sector": info.get("sector") or inst_sector,
         "industry": info.get("industry"),
         "country": info.get("country"),
         "currency": info.get("currency"),
@@ -426,7 +454,7 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
     if fields["beta"] is None and symbol.upper().endswith(".KA"):
         fields["beta"] = await compute_beta(symbol, db=db)
 
-    missing_fields = [k for k, v in fields.items() if v is None and k not in ("sector", "industry", "country", "currency")]
+    missing_fields = [k for k, v in fields.items() if v is None and k not in ("asset_class", "sector", "industry", "country", "currency")]
     result = {"symbol": symbol, "missing_fields": missing_fields}
     # Convert Decimal values to str for JSON safety; leave None as None
     for k, v in fields.items():
@@ -683,7 +711,103 @@ def _subject_ratios(bundle: Dict[str, Any]) -> Dict[str, Optional[Decimal]]:
         if revenue is not None and revenue > 0:
             ps = market_cap / revenue
 
-    return {"pe": pe, "forward_pe": forward_pe, "ev_ebitda": ev_ebitda, "pb": pb, "ps": ps}
+    # Trailing EPS — info.trailingEps → price / P/E (consistent with the reported
+    # ratio) → net income / shares. The price/PE step avoids the unit mismatch you
+    # get from raw net-income/shares on PSX statements.
+    eps = _to_decimal(info.get("trailingEps"))
+    if eps is None and price is not None and pe is not None and pe > 0:
+        eps = price / pe
+    if eps is None and shares and shares > 0:
+        net_income = _find_row(income, "net income from continuing operation", "net income")
+        if net_income is not None:
+            eps = net_income / shares
+
+    return {"pe": pe, "forward_pe": forward_pe, "ev_ebitda": ev_ebitda, "pb": pb, "ps": ps, "eps": eps}
+
+
+async def _relative_valuation(
+    symbol: str, subject: Dict[str, Optional[Decimal]], bundle: Dict[str, Any]
+) -> Dict[str, Any]:
+    """Fair price = industry-average P/E × trailing EPS, then an over/under verdict.
+
+    industry P/E (layered): median P/E of same-sector seeded peers → maintained
+    sector benchmark (``core.sector_pe``). Also returns the instrument's sector +
+    asset class. Equity-only for the verdict; sector/asset_class returned for all.
+    """
+    from app.core.sector_pe import industry_pe_for_sector
+
+    info = bundle.get("info") or {}
+    price = _to_decimal(info.get("currentPrice") or info.get("regularMarketPrice"))
+    eps = subject.get("eps")
+
+    sector: Optional[str] = None
+    asset_class: Optional[str] = None
+    industry_pe: Optional[Decimal] = None
+    source: Optional[str] = None
+    try:
+        from sqlalchemy import select
+        from app.core.db import async_session_factory
+        from app.models.instrument import Instrument
+        from app.models.instrument_fundamentals import InstrumentFundamentals
+
+        async with async_session_factory() as db:
+            inst = (await db.execute(
+                select(Instrument).where(Instrument.symbol == symbol.upper())
+            )).scalar_one_or_none()
+            if inst is not None:
+                sector, asset_class = inst.sector, inst.asset_class
+                # Peer-median P/E from same-sector seeded instruments.
+                if sector:
+                    rows = (await db.execute(
+                        select(InstrumentFundamentals.payload).join(
+                            Instrument, Instrument.id == InstrumentFundamentals.instrument_id
+                        ).where(Instrument.sector == sector, Instrument.symbol != symbol.upper())
+                    )).scalars().all()
+                    peer_pes = []
+                    for p in rows:
+                        v = _to_decimal((p.get("info") or {}).get("trailingPE"))
+                        if v is not None and v > 0:
+                            peer_pes.append(v)
+                    if len(peer_pes) >= 2:
+                        peer_pes.sort()
+                        mid = len(peer_pes) // 2
+                        industry_pe = peer_pes[mid] if len(peer_pes) % 2 else (peer_pes[mid - 1] + peer_pes[mid]) / 2
+                        source = "peer_median"
+    except Exception as exc:
+        logger.warning("Relative-valuation sector lookup failed for %s: %s", symbol, exc)
+
+    if industry_pe is None:
+        industry_pe = industry_pe_for_sector(sector)
+        source = "sector_benchmark"
+
+    fair_value = None
+    verdict = None
+    equity = asset_class in (None, "psx_stock", "global_stock", "equity")
+    if equity and eps is not None and eps > 0 and industry_pe is not None:
+        fair_value = industry_pe * eps
+        if price is not None and fair_value > 0:
+            ratio = price / fair_value
+            gap = (ratio - 1) * 100
+            if ratio < Decimal("0.9"):
+                verdict = f"appears undervalued by ~{abs(gap):.0f}% vs the sector multiple"
+            elif ratio > Decimal("1.1"):
+                verdict = f"appears overvalued by ~{gap:.0f}% vs the sector multiple"
+            else:
+                verdict = "appears fairly valued vs the sector multiple"
+
+    def _s(v):
+        return str(v.quantize(Decimal("0.01"))) if isinstance(v, Decimal) else v
+
+    return {
+        "asset_class": asset_class,
+        "sector": sector,
+        "current_price": _s(price),
+        "eps": _s(eps),
+        "industry_pe": _s(industry_pe),
+        "industry_pe_source": source,
+        "fair_value": _s(fair_value),
+        "verdict": verdict,
+    }
 
 
 async def run_multiples(
@@ -691,7 +815,9 @@ async def run_multiples(
     peers: Optional[List[str]] = None,
 ) -> Dict[str, Any]:
     """
-    Relative valuation: P/E, EV/EBITDA, P/B for subject vs peers.
+    Relative valuation: P/E, EV/EBITDA, P/B for subject vs peers, plus an
+    industry-P/E × EPS fair-value + over/under verdict and the instrument's
+    sector + asset class.
 
     Returns the flat shape the frontend ``MultiplesResult`` expects
     (``pe_ratio`` / ``ev_ebitda`` / ``pb_ratio`` + peer medians). Ratios yfinance
@@ -705,7 +831,8 @@ async def run_multiples(
         bundle = await _yf_get_fundamentals(_yf_equity_symbol(sym))
         return _subject_ratios(bundle)
 
-    subject = await _ratios(symbol)
+    subject_bundle = await _yf_get_fundamentals(symbol)
+    subject = _subject_ratios(subject_bundle)
     peer_ratios = await asyncio.gather(*[_ratios(p) for p in peers]) if peers else []
 
     def _median(key: str) -> Optional[Decimal]:
@@ -723,6 +850,8 @@ async def run_multiples(
         except Exception:
             return str(v)
 
+    rel = await _relative_valuation(symbol, subject, subject_bundle)
+
     return {
         "pe_ratio": _s(subject["pe"]),
         "forward_pe": _s(subject["forward_pe"]),
@@ -732,6 +861,15 @@ async def run_multiples(
         "peer_pe_median": _s(_median("pe")),
         "peer_ev_ebitda_median": _s(_median("ev_ebitda")),
         "peer_pb_median": _s(_median("pb")),
+        # Industry-P/E × EPS relative valuation + instrument metadata.
+        "eps": rel["eps"],
+        "industry_pe": rel["industry_pe"],
+        "industry_pe_source": rel["industry_pe_source"],
+        "fair_value": rel["fair_value"],
+        "verdict": rel["verdict"],
+        "asset_class": rel["asset_class"],
+        "sector": rel["sector"],
+        "current_price": rel["current_price"],
         "missing_note": (
             "Ratios yfinance omits for PSX stocks are computed from financial statements."
             if symbol.endswith(".KA") else None
