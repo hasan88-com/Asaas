@@ -67,20 +67,14 @@ class PerformanceService:
             qty = Decimal(str(holding.quantity or 0))
             entry = Decimal(str(holding.entry_price or 0))
 
-            # Conversion for commodities (USD to PKR) — live FX rate
-            px_pkr = latest_price
-            entry_pkr = entry
-            if inst.currency == "USD":
-                try:
-                    fx_rate = await get_usd_pkr_rate()
-                except RuntimeError:
-                    fx_rate = None
-                if fx_rate is not None:
-                    px_pkr = latest_price * fx_rate
-                    entry_pkr = entry * fx_rate
-
-            total_value += qty * px_pkr
-            cost_basis += qty * entry_pkr
+            # Value holdings exactly like the live performance endpoint
+            # (app/api/portfolio.py::get_performance): qty × price, with NO FX
+            # conversion. Quantities are derived in the app's price-as-PKR
+            # convention, so applying USD→PKR FX here (as the old code did) made
+            # the snapshot/chart diverge from the live hero value by ~the FX rate
+            # for USD instruments (e.g. gold), inflating the chart to millions.
+            total_value += qty * latest_price
+            cost_basis += qty * entry
 
         pnl_abs = total_value - cost_basis
         pnl_pct = pnl_abs / cost_basis if cost_basis > 0 else Decimal("0.00")
