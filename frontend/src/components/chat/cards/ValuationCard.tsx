@@ -227,10 +227,13 @@ export function ValuationCard({ data, className }: ValuationCardProps) {
     <CardShell eyebrow="Valuation" accentColor={ACCENT} className={className}>
       {/* Company header */}
       <div className="mb-4">
-        <p className="font-sans font-semibold text-[16px] text-ink">{data.company_info.name}</p>
-        {data.company_info.sector && (
-          <p className="text-[13px] text-ink-faint">{data.company_info.sector}</p>
-        )}
+        <p className="font-sans font-semibold text-[16px] text-ink">{data.company_info.name || data.symbol}</p>
+        <p className="text-[13px] text-ink-faint">
+          {[data.multiples.asset_class, data.multiples.sector || data.company_info.sector]
+            .filter(Boolean)
+            .map((s) => String(s).replace(/_/g, ' '))
+            .join(' · ')}
+        </p>
       </div>
 
       {bothMissing ? (
@@ -299,6 +302,26 @@ export function ValuationCard({ data, className }: ValuationCardProps) {
         />
         <MultiplesCell label="P/B" value={data.multiples.pb_ratio} />
       </div>
+
+      {/* Industry-P/E × EPS fair value + verdict */}
+      {data.multiples.fair_value && (
+        <div className="mt-3 pt-3 border-t border-line-soft">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint mb-1">
+            Sector-multiple fair value
+          </p>
+          <div className="flex items-baseline gap-2 flex-wrap">
+            <span className="font-display text-[20px] font-semibold text-ink">
+              ₨{parseFloat(data.multiples.fair_value).toLocaleString('en-PK', { maximumFractionDigits: 2 })}
+            </span>
+            <span className="font-mono text-[12px] text-ink-faint">
+              = industry P/E {data.multiples.industry_pe} × EPS {data.multiples.eps}
+            </span>
+          </div>
+          {data.multiples.verdict && (
+            <p className="text-[13px] text-ink-soft mt-1">{data.multiples.verdict}</p>
+          )}
+        </div>
+      )}
 
       <p className="text-[11px] text-ink-faint mt-4 leading-[1.4]">
         For informational purposes only. Not a buy, sell, or hold recommendation.
