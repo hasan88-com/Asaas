@@ -10,6 +10,7 @@ from app.models.risk_profile import RiskProfile
 from app.models.ips import InvestmentPolicyStatement
 from app.models.portfolio_recommendation import PortfolioRecommendation
 from app.models.instrument import Instrument
+from app.models.instrument_fundamentals import InstrumentFundamentals
 from app.models.price import Price
 from app.models.portfolio import Portfolio
 from app.models.holding import Holding
@@ -27,6 +28,7 @@ __all__ = [
     "InvestmentPolicyStatement",
     "PortfolioRecommendation",
     "Instrument",
+    "InstrumentFundamentals",
     "Price",
     "Portfolio",
     "Holding",

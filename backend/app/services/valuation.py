@@ -12,7 +12,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
-from datetime import date
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Any, Dict, List, Optional
 
@@ -125,11 +125,17 @@ async def _yf_get_fundamentals(symbol: str) -> Dict[str, Any]:
 
     if looks_empty:
         if cached:
-            logger.info("yfinance throttled for %s — serving last-known-good fundamentals.", symbol)
+            logger.info("yfinance throttled for %s — serving in-process last-known-good.", symbol)
             stale = dict(cached)
             stale["stale"] = True
             return stale
-        # Nothing cached and nothing fetched — return uncached so we retry next call.
+        # Nothing fresh, nothing in-process → DB-persisted snapshot (survives the
+        # Yahoo rate-limiting that blocks cloud IPs like Render).
+        persisted = await _load_persisted_fundamentals(symbol)
+        if persisted is not None:
+            logger.info("yfinance throttled for %s — serving DB-persisted fundamentals.", symbol)
+            _fundamentals_cache[symbol] = persisted
+            return persisted
         return {
             "info": info, "income": income, "cashflow": cashflow,
             "balance": balance, "fetched_at": now, "stale": True,
@@ -140,7 +146,126 @@ async def _yf_get_fundamentals(symbol: str) -> Dict[str, Any]:
         "balance": balance, "fetched_at": now, "stale": False,
     }
     _fundamentals_cache[symbol] = bundle
+    await _persist_fundamentals(symbol, bundle)  # so cloud reads survive throttling
     return bundle
+
+
+# --- DB-persisted fundamentals (last-known-good for rate-limited environments) --
+
+_CACHED_INFO_KEYS = (
+    "regularMarketPrice", "currentPrice", "marketCap", "sharesOutstanding",
+    "trailingPE", "forwardPE", "trailingEps", "priceToBook", "bookValue",
+    "enterpriseValue", "enterpriseToEbitda", "ebitda", "priceToSalesTrailing12Months",
+    "beta", "earningsGrowth", "dividendYield", "returnOnEquity", "returnOnAssets",
+    "debtToEquity", "currentRatio", "revenueGrowth", "longName", "shortName",
+    "sector", "industry", "country", "currency",
+)
+
+
+def _coerce_json(v: Any) -> Any:
+    if v is None or isinstance(v, (bool, str)):
+        return v
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return str(v)
+
+
+def _stmt_latest_col(df: Any) -> Dict[str, float]:
+    """Latest fiscal column of a statement as {label: float} (JSON-safe)."""
+    if _df_empty(df):
+        return {}
+    out: Dict[str, float] = {}
+    try:
+        col = df.iloc[:, 0]
+        for idx, val in col.items():
+            if val is None:
+                continue
+            try:
+                f = float(val)
+            except (TypeError, ValueError):
+                continue
+            if f == f:  # not NaN
+                out[str(idx)] = f
+    except Exception:
+        return {}
+    return out
+
+
+def _serialize_bundle(bundle: Dict[str, Any]) -> Dict[str, Any]:
+    info = bundle.get("info") or {}
+    return {
+        "info": {k: _coerce_json(info.get(k)) for k in _CACHED_INFO_KEYS if info.get(k) is not None},
+        "income": _stmt_latest_col(bundle.get("income")),
+        "cashflow": _stmt_latest_col(bundle.get("cashflow")),
+        "balance": _stmt_latest_col(bundle.get("balance")),
+    }
+
+
+def _deserialize_bundle(payload: Dict[str, Any]) -> Dict[str, Any]:
+    import pandas as pd
+
+    def _df(d):
+        if not d:
+            return None
+        return pd.Series(d, dtype="float64").to_frame("v")  # index=labels, 1 col → _find_row works
+
+    return {
+        "info": payload.get("info") or {},
+        "income": _df(payload.get("income")),
+        "cashflow": _df(payload.get("cashflow")),
+        "balance": _df(payload.get("balance")),
+        "fetched_at": time.time(),
+        "stale": True,
+    }
+
+
+async def _persist_fundamentals(symbol: str, bundle: Dict[str, Any]) -> None:
+    """Upsert a JSON snapshot of the fundamentals for this symbol (best-effort)."""
+    try:
+        from sqlalchemy import select
+        from sqlalchemy.dialects.postgresql import insert as pg_insert
+        from app.core.db import async_session_factory
+        from app.models.instrument import Instrument
+        from app.models.instrument_fundamentals import InstrumentFundamentals
+
+        payload = _serialize_bundle(bundle)
+        sym = symbol.upper()
+        async with async_session_factory() as db:
+            inst = (await db.execute(
+                select(Instrument).where(Instrument.symbol == sym)
+            )).scalar_one_or_none()
+            if inst is None:
+                return
+            now = datetime.now(timezone.utc)
+            stmt = pg_insert(InstrumentFundamentals).values(
+                instrument_id=inst.id, symbol=sym, payload=payload, fetched_at=now,
+            ).on_conflict_do_update(
+                index_elements=["instrument_id"],
+                set_={"payload": payload, "fetched_at": now, "symbol": sym},
+            )
+            await db.execute(stmt)
+            await db.commit()
+    except Exception as exc:
+        logger.warning("Persist fundamentals failed for %s: %s", symbol, exc)
+
+
+async def _load_persisted_fundamentals(symbol: str) -> Optional[Dict[str, Any]]:
+    try:
+        from sqlalchemy import select
+        from app.core.db import async_session_factory
+        from app.models.instrument_fundamentals import InstrumentFundamentals
+
+        async with async_session_factory() as db:
+            row = (await db.execute(
+                select(InstrumentFundamentals).where(InstrumentFundamentals.symbol == symbol.upper())
+            )).scalar_one_or_none()
+            if row is None:
+                return None
+            return _deserialize_bundle(row.payload)
+    except Exception as exc:
+        logger.warning("Load persisted fundamentals failed for %s: %s", symbol, exc)
+        return None
 
 
 def _yf_equity_symbol(symbol: str) -> str:
