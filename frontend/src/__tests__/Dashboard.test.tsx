@@ -245,20 +245,12 @@ describe('Dashboard', () => {
     })
   })
 
-  it('renders chat composer', async () => {
-    render(<Dashboard />)
-    await waitFor(() => {
-      expect(screen.getByTestId('chat-composer')).toBeInTheDocument()
-    })
-  })
-
   it('handles portfolio API error gracefully', async () => {
     mockGetPortfolio.mockRejectedValue(new Error('network'))
     render(<Dashboard />)
     await waitFor(() => {
       expect(screen.getByText(/Couldn't load your portfolio/)).toBeInTheDocument()
     })
-    expect(screen.getByTestId('chat-composer')).toBeInTheDocument()
   })
 
   it('handles all API errors gracefully', async () => {

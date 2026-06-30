@@ -487,3 +487,20 @@ export interface StrategyRunResult {
   kind: StrategyKind
   result: Record<string, unknown>
 }
+
+/* ------------------------------------------------------------------ */
+/* Raabta AI — conversations                                           */
+/* ------------------------------------------------------------------ */
+export interface Conversation {
+  id: string
+  title: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ConversationMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  created_at: string
+}

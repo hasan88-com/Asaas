@@ -20,7 +20,6 @@ const Suggestion = lazy(() => import('@/pages/onboarding/Suggestion'))
 
 // Core app
 const Dashboard = lazy(() => import('@/pages/Dashboard'))
-const Chat = lazy(() => import('@/pages/Chat'))
 const News = lazy(() => import('@/pages/News'))
 const Flags = lazy(() => import('@/pages/Flags'))
 const HoldingDetail = lazy(() => import('@/pages/HoldingDetail'))
@@ -69,7 +68,6 @@ export default function App() {
             {/* Core app with nav shell */}
             <Route element={<AppShell />}>
               <Route path="/dashboard" element={<Dashboard />} />
-              <Route path="/chat" element={<Chat />} />
               <Route path="/news" element={<News />} />
               <Route path="/news-chat" element={<NewsChat />} />
               <Route path="/debt-market" element={<DebtMarket />} />

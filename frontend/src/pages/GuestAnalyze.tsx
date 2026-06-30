@@ -187,7 +187,7 @@ export default function GuestAnalyze() {
         {/* Header */}
         <div className="text-center">
           <div className="flex items-center justify-center gap-2 mb-2">
-            <img src="/logo.png" alt="Asaas" className="h-10 w-auto" />
+            <img src="/logo.png" alt="Asaasa" className="h-10 w-auto" />
             <span className="font-display text-[24px] font-semibold text-ink">اثاثہ</span>
           </div>
           <h1 className="font-display text-[22px] font-semibold text-ink">Analyse your portfolio</h1>

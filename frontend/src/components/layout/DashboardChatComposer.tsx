@@ -67,7 +67,7 @@ export function DashboardChatComposer() {
           {/* Input row */}
           <div className="flex items-end gap-2">
             <span className="font-mono text-[10px] text-ink-faint uppercase tracking-[0.1em] shrink-0 pb-2 hidden sm:block">
-              Asaas agent
+              Asaasa agent
             </span>
             <div className="flex-1 flex items-end gap-2 bg-ink-soft rounded-[10px] px-3 py-2 border border-line-soft">
               <textarea

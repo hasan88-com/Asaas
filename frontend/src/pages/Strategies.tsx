@@ -119,7 +119,7 @@ export default function Strategies() {
           <h1 className="font-display text-[28px] font-semibold text-ink">Strategies</h1>
           <p className="font-sans text-[14px] text-ink-soft mt-1">
             No-code rules for allocation and screening — parameterizes the same optimizer and
-            data engine used elsewhere in Asaas.
+            data engine used elsewhere in Asaasa.
           </p>
         </div>
         {!showWizard && (

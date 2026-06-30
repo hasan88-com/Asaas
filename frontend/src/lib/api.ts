@@ -20,6 +20,8 @@ import type {
   NewsScrapeStatus,
   MarketSentimentResponse,
   RiskMetricsResponse,
+  Conversation,
+  ConversationMessage,
 } from '@/types/api'
 import type { SSEEvent } from '@/types/chat'
 
@@ -183,12 +185,13 @@ export async function streamChat(
     onDone?: (agentRole: string) => void
   },
   signal?: AbortSignal,
+  conversationId?: string,
 ): Promise<void> {
   const headers = await authHeaders()
   const res = await fetch(`${BASE}/chat`, {
     method: 'POST',
     headers,
-    body: JSON.stringify({ message }),
+    body: JSON.stringify({ message, conversation_id: conversationId }),
     signal,
   })
 
@@ -245,6 +248,25 @@ export function getChatHistory(): Promise<ChatHistoryItem[]> {
       created_at: item.created_at as string,
     })),
   )
+}
+
+/* ------------------------------------------------------------------ */
+/* Raabta AI — conversations                                            */
+/* ------------------------------------------------------------------ */
+export function getConversations(): Promise<Conversation[]> {
+  return get<Conversation[]>('/chat/conversations')
+}
+
+export function createConversation(): Promise<Conversation> {
+  return post<Conversation>('/chat/conversations')
+}
+
+export function getConversationMessages(id: string): Promise<ConversationMessage[]> {
+  return get<ConversationMessage[]>(`/chat/conversations/${id}`)
+}
+
+export function deleteConversation(id: string): Promise<void> {
+  return del(`/chat/conversations/${id}`)
 }
 
 /* ------------------------------------------------------------------ */

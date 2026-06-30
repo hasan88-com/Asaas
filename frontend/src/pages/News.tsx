@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { getNewsFeed, triggerNewsScrape, getScrapeStatus } from '@/lib/api'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -41,7 +40,6 @@ function formatDate(iso: string): string {
 }
 
 export default function News() {
-  const navigate = useNavigate()
   const [items, setItems] = useState<NewsItemResponse[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterLevel>('all')
@@ -93,16 +91,13 @@ export default function News() {
     }, 3000)
   }
 
-  // "Affect on my portfolio?" — jump to chat and ask the AI about this specific headline only.
+  // "Affect on my portfolio?" — open Raabta AI seeded with this specific headline only.
   const askAffect = (item: NewsItemResponse) => {
     const syms = item.affected_symbols?.length ? ` Symbols mentioned: ${item.affected_symbols.join(', ')}.` : ''
-    navigate('/chat', {
-      state: {
-        seedMessage:
-          `Analyse only this single news item and its impact on my portfolio holdings: "${item.headline}".${syms} ` +
-          `Which of my holdings are affected, and should I be concerned? Do not discuss any other news.`,
-      },
-    })
+    const message =
+      `Analyse only this single news item and its impact on my portfolio holdings: "${item.headline}".${syms} ` +
+      `Which of my holdings are affected, and should I be concerned? Do not discuss any other news.`
+    window.dispatchEvent(new CustomEvent('raabta:ask', { detail: { message } }))
   }
 
   const visible = items.filter(
@@ -129,12 +124,6 @@ export default function News() {
             className="text-[12px] btn-press min-w-[120px]"
           >
             {refreshing ? `⏳ Scraping…${progress ? ` ${progress}` : ''}` : '🔄 Refresh'}
-          </Button>
-          <Button variant="outline" onClick={() => navigate('/debt-market')} className="text-[12px] btn-press">
-            📊 Debt Market
-          </Button>
-          <Button variant="primary" onClick={() => navigate('/news-chat')} className="text-[12px] btn-press">
-            💬 Ask AI Analyst
           </Button>
         </div>
       </div>

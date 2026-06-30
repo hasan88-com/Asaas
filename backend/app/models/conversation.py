@@ -1,7 +1,9 @@
 """
-Asaas (اثاثہ) — Chat Message Model
+Asaasa — Conversation Model
 
-Schema: TECH.md §7.2 `chat_messages` table.
+Groups chat_messages into ChatGPT-style conversations for Raabta AI: each row is
+one conversation thread with an auto-generated topic title. Messages link via
+ChatMessage.conversation_id.
 """
 
 from __future__ import annotations
@@ -10,14 +12,14 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import DateTime, ForeignKey, Text, func
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.core.db import Base
 
 
-class ChatMessage(Base):
-    __tablename__ = "chat_messages"
+class Conversation(Base):
+    __tablename__ = "conversations"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -31,24 +33,17 @@ class ChatMessage(Base):
         nullable=False,
         index=True,
     )
-    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("conversations.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True,
-    )
-    role: Mapped[str] = mapped_column(
-        Text, nullable=False
-    )  # user / assistant
-    content: Mapped[str] = mapped_column(Text, nullable=False)
-    tool_calls: Mapped[dict | None] = mapped_column(
-        JSONB, nullable=True
-    )  # tools invoked + results (audit)
+    title: Mapped[str] = mapped_column(Text, nullable=False, default="New chat")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(timezone.utc),
         server_default=func.now(),
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        server_default=func.now(),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
 
-    # --- Relationships ---
-    user = relationship("User", back_populates="chat_messages")
+    user = relationship("User")

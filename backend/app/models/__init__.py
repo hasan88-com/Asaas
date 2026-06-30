@@ -18,6 +18,7 @@ from app.models.news import NewsItem, NewsHoldingLink
 from app.models.market_sentiment import MarketSentimentSnapshot
 from app.models.flag import Flag
 from app.models.chat_message import ChatMessage
+from app.models.conversation import Conversation
 from app.models.strategy import Strategy
 
 __all__ = [
@@ -35,5 +36,6 @@ __all__ = [
     "MarketSentimentSnapshot",
     "Flag",
     "ChatMessage",
+    "Conversation",
     "Strategy",
 ]

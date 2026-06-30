@@ -4,6 +4,7 @@ import { User } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { NavBar } from './NavBar'
 import { MarketTicker } from './MarketTicker'
+import { RaabtaAI } from './RaabtaAI'
 import { getFlags } from '@/lib/api'
 import { cn } from '@/lib/utils'
 
@@ -33,7 +34,7 @@ export function AppShell() {
             to="/dashboard"
             className="flex items-center gap-2 focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2 rounded"
           >
-            <img src="/logo.png" alt="Asaas" className="h-8 w-auto" />
+            <img src="/logo.png" alt="Asaasa" className="h-8 w-auto" />
             <span className="font-display text-[18px] font-semibold text-ink hidden sm:block">اثاثہ</span>
           </Link>
 
@@ -64,6 +65,9 @@ export function AppShell() {
 
       {/* Mobile bottom tab bar */}
       <NavBar flagCount={flagCount} variant="bottom" />
+
+      {/* Raabta AI — floating assistant on every page */}
+      <RaabtaAI />
     </div>
   )
 }

@@ -51,7 +51,7 @@ export function Composer({ onSend, disabled }: ComposerProps) {
         onChange={handleChange}
         onKeyDown={handleKeyDown}
         rows={1}
-        placeholder="Ask Asaas…"
+        placeholder="Ask Asaasa…"
         disabled={disabled}
         aria-label="Message"
         className={cn(
