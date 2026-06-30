@@ -112,41 +112,45 @@ async def _yf_get_fundamentals(symbol: str) -> Dict[str, Any]:
         logger.warning("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
 
     info = info or {}
-    has_price = (
-        info.get("regularMarketPrice") is not None
-        or info.get("currentPrice") is not None
-    )
-    looks_empty = (
-        not has_price
-        and _df_empty(income)
-        and _df_empty(cashflow)
-        and _df_empty(balance)
+    # A fetch only counts as "complete" when it brought financial statements.
+    # On a throttled cloud IP (Render) Yahoo often returns a price-only / empty
+    # response; treating that as success would persist a thin bundle OVER the
+    # good DB seed and wipe P/E/EV-EBITDA/P/B. So when statements are missing we
+    # serve the persisted snapshot instead and never let an empty fetch clobber it.
+    statements_present = not (
+        _df_empty(income) and _df_empty(cashflow) and _df_empty(balance)
     )
 
-    if looks_empty:
-        if cached:
-            logger.info("yfinance throttled for %s — serving in-process last-known-good.", symbol)
-            stale = dict(cached)
-            stale["stale"] = True
-            return stale
-        # Nothing fresh, nothing in-process → DB-persisted snapshot (survives the
-        # Yahoo rate-limiting that blocks cloud IPs like Render).
-        persisted = await _load_persisted_fundamentals(symbol)
-        if persisted is not None:
-            logger.info("yfinance throttled for %s — serving DB-persisted fundamentals.", symbol)
-            _fundamentals_cache[symbol] = persisted
-            return persisted
-        return {
+    if statements_present:
+        bundle = {
             "info": info, "income": income, "cashflow": cashflow,
-            "balance": balance, "fetched_at": now, "stale": True,
+            "balance": balance, "fetched_at": now, "stale": False,
         }
+        _fundamentals_cache[symbol] = bundle
+        await _persist_fundamentals(symbol, bundle)  # merge-upsert (never erases)
+        return bundle
 
-    bundle = {
-        "info": info, "income": income, "cashflow": cashflow,
-        "balance": balance, "fetched_at": now, "stale": False,
-    }
-    _fundamentals_cache[symbol] = bundle
-    await _persist_fundamentals(symbol, bundle)  # so cloud reads survive throttling
+    # No statements this time → prefer the DB-persisted last-known-good.
+    persisted = await _load_persisted_fundamentals(symbol)
+    if persisted is not None:
+        logger.info("No live statements for %s — serving DB-persisted fundamentals.", symbol)
+        # If the live call still gave fresh `info`, merge it over the cached info.
+        if info:
+            persisted = {**persisted, "info": {**persisted.get("info", {}), **{k: v for k, v in info.items() if v is not None}}}
+        _fundamentals_cache[symbol] = persisted
+        if info:
+            await _persist_fundamentals(symbol, {"info": info, "income": None, "cashflow": None, "balance": None})
+        return persisted
+
+    if cached:
+        stale = dict(cached); stale["stale"] = True
+        return stale
+
+    # Nothing anywhere — return whatever info we have (P/E may still resolve), and
+    # seed it so a later request has something to merge onto.
+    bundle = {"info": info, "income": income, "cashflow": cashflow, "balance": balance, "fetched_at": now, "stale": True}
+    if info:
+        await _persist_fundamentals(symbol, bundle)
     return bundle
 
 
@@ -229,7 +233,7 @@ async def _persist_fundamentals(symbol: str, bundle: Dict[str, Any]) -> None:
         from app.models.instrument import Instrument
         from app.models.instrument_fundamentals import InstrumentFundamentals
 
-        payload = _serialize_bundle(bundle)
+        new = _serialize_bundle(bundle)
         sym = symbol.upper()
         async with async_session_factory() as db:
             inst = (await db.execute(
@@ -237,6 +241,18 @@ async def _persist_fundamentals(symbol: str, bundle: Dict[str, Any]) -> None:
             )).scalar_one_or_none()
             if inst is None:
                 return
+            # Merge with any existing snapshot so a partial fetch never erases
+            # previously-captured statements/info (only fills/refreshes them).
+            existing = (await db.execute(
+                select(InstrumentFundamentals).where(InstrumentFundamentals.instrument_id == inst.id)
+            )).scalar_one_or_none()
+            old = existing.payload if existing else {}
+            payload = {
+                "info": {**(old.get("info") or {}), **(new.get("info") or {})},
+                "income": new.get("income") or old.get("income") or {},
+                "cashflow": new.get("cashflow") or old.get("cashflow") or {},
+                "balance": new.get("balance") or old.get("balance") or {},
+            }
             now = datetime.now(timezone.utc)
             stmt = pg_insert(InstrumentFundamentals).values(
                 instrument_id=inst.id, symbol=sym, payload=payload, fetched_at=now,
