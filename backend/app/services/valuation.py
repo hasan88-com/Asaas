@@ -236,53 +236,55 @@ async def run_dcf(
         logger.error("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
         return {"insufficient_data": True, "reason": f"Could not fetch fundamentals: {exc}"}
 
-    # Extract Free Cash Flow = Operating CF - CapEx
-    # yfinance index labels vary across versions and markets — try all known variants.
-    _OP_CF_LABELS = (
-        "Operating Cash Flow",
-        "Total Cash From Operating Activities",
-        "Cash Flow From Continuing Operating Activities",
-        "OperatingCashFlow",
-    )
-    _CAPEX_LABELS = (
-        "Capital Expenditure",
-        "Capital Expenditures",
-        "Purchase Of Property Plant And Equipment",
-        "CapitalExpenditure",
-    )
-    _NET_INCOME_LABELS = (
-        "Net Income",
-        "Net Income Common Stockholders",
-        "NetIncome",
-    )
+    # Extract Free Cash Flow = Operating CF - CapEx.
+    # Use fuzzy keyword matching on the index so we're not sensitive to
+    # exact yfinance label strings (which change across versions/markets).
+    def _find_row(df, *keywords):
+        """Return first row value whose index label contains ALL keywords (case-insensitive)."""
+        if df is None or df.empty:
+            return None
+        for idx in df.index:
+            low = str(idx).lower().replace("_", " ")
+            if all(kw.lower() in low for kw in keywords):
+                vals = df.loc[idx].dropna()
+                if not vals.empty:
+                    v = _to_decimal(vals.iloc[0])
+                    if v is not None:
+                        logger.debug("DCF %s: matched '%s' → %s", symbol, idx, v)
+                        return v
+        return None
 
     try:
-        op_cf = None
-        capex = None
         if cashflow is not None and not cashflow.empty:
-            for label in _OP_CF_LABELS:
-                if label in cashflow.index:
-                    vals = cashflow.loc[label].dropna()
-                    if not vals.empty:
-                        op_cf = _to_decimal(vals.iloc[0])
-                        break
-            for label in _CAPEX_LABELS:
-                if label in cashflow.index:
-                    vals = cashflow.loc[label].dropna()
-                    if not vals.empty:
-                        capex = _to_decimal(vals.iloc[0])
-                        break
+            logger.info("DCF %s cashflow rows: %s", symbol, list(cashflow.index))
+        if income_stmt is not None and not income_stmt.empty:
+            logger.info("DCF %s income rows: %s", symbol, list(income_stmt.index))
+        if balance_sheet is not None and not balance_sheet.empty:
+            logger.info("DCF %s balance rows: %s", symbol, list(balance_sheet.index))
 
-        # Fallback: use net income from income_stmt as a proxy FCF when
-        # the cashflow statement is absent (common for PSX .KA tickers).
+        op_cf = (
+            _find_row(cashflow, "operating") or
+            _find_row(cashflow, "operating", "cash")
+        )
+        capex = (
+            _find_row(cashflow, "capital", "expenditure") or
+            _find_row(cashflow, "capital", "expenditures") or
+            _find_row(cashflow, "purchase", "property")
+        )
+
+        # Fallback: use free cash flow row if present
+        if op_cf is None:
+            op_cf = _find_row(cashflow, "free", "cash")
+
+        # Fallback: net income from income_stmt as proxy FCF
         if op_cf is None and income_stmt is not None and not income_stmt.empty:
-            for label in _NET_INCOME_LABELS:
-                if label in income_stmt.index:
-                    vals = income_stmt.loc[label].dropna()
-                    if not vals.empty:
-                        op_cf = _to_decimal(vals.iloc[0])
-                        logger.info("DCF for %s: using net income as FCF proxy (no cashflow stmt)", symbol)
-                        break
+            op_cf = (
+                _find_row(income_stmt, "net", "income") or
+                _find_row(income_stmt, "net income")
+            )
+            if op_cf is not None:
+                logger.info("DCF for %s: using net income as FCF proxy", symbol)
+
     except Exception as exc:
         logger.warning("Cash flow parsing error for %s: %s", symbol, exc)
         op_cf = None
@@ -339,21 +341,15 @@ async def run_dcf(
     net_debt = Decimal("0")
     try:
         if balance_sheet is not None and not balance_sheet.empty:
-            total_debt = None
-            cash = None
-            for label in ("Total Debt", "Long Term Debt", "TotalDebt", "LongTermDebt"):
-                if label in balance_sheet.index:
-                    vals = balance_sheet.loc[label].dropna()
-                    if not vals.empty:
-                        total_debt = _to_decimal(vals.iloc[0])
-                        break
-            for label in ("Cash And Cash Equivalents", "Cash", "CashAndCashEquivalents",
-                          "Cash Cash Equivalents And Short Term Investments"):
-                if label in balance_sheet.index:
-                    vals = balance_sheet.loc[label].dropna()
-                    if not vals.empty:
-                        cash = _to_decimal(vals.iloc[0])
-                        break
+            total_debt = (
+                _find_row(balance_sheet, "total", "debt") or
+                _find_row(balance_sheet, "long", "term", "debt")
+            )
+            cash = (
+                _find_row(balance_sheet, "cash", "equivalents") or
+                _find_row(balance_sheet, "cash", "short", "term") or
+                _find_row(balance_sheet, "cash")
+            )
             if total_debt is not None and cash is not None:
                 net_debt = total_debt - cash
     except Exception:
