@@ -297,6 +297,12 @@ export function postSuggest(): Promise<PortfolioResponse> {
   return post<Record<string, unknown>>('/portfolio/suggest').then(transformPortfolio)
 }
 
+export function getHoldingHistory(
+  symbol: string,
+): Promise<{ symbol: string; history: { date: string; value: string }[] }> {
+  return get(`/portfolio/holdings/${encodeURIComponent(symbol)}/history`)
+}
+
 export function postConfirm(holdings: HoldingResponse[]): Promise<PortfolioResponse> {
   return post<Record<string, unknown>>('/portfolio/confirm', { holdings }).then(transformPortfolio)
 }

@@ -17,6 +17,9 @@ logger = logging.getLogger("asaas.market_utils")
 
 _FX_CACHE_KEY = "market:fx:usd_pkr"
 _FX_CACHE_TTL = 3600  # 1 hour — FX is stable intraday
+# Persistent last-known-good FX rate (no expiry) — the most recent real rate,
+# used as a graceful fallback so a transient outage never blocks valuation.
+_FX_LAST_GOOD_KEY = "market:fx:usd_pkr:last_good"
 
 _SBP_CACHE_KEY = "market:sbp:policy_rate"
 _SBP_CACHE_TTL = 3600  # 1 hour
@@ -50,16 +53,23 @@ async def get_usd_pkr_rate() -> Decimal:
         result = await yf.fetch_price("PKR=X")
         if result and result.get("price") is not None:
             rate = Decimal(str(result["price"]))
-            try:
-                await redis_client.setex(_FX_CACHE_KEY, _FX_CACHE_TTL, str(rate))
-            except Exception:
-                pass
+            await _cache_fx(rate)
             logger.info("Fetched live USD/PKR rate: %s", rate)
             return rate
     except Exception as e:
         logger.warning("yfinance USD/PKR fetch failed: %s", e)
 
-    # 3. Try stale cache
+    # 3. DuckDuckGo search fallback (no API key) before giving up on a live rate.
+    try:
+        from app.data.adapters.fx_search_adapter import fetch_usd_pkr_via_search
+        rate = await fetch_usd_pkr_via_search()
+        if rate is not None:
+            await _cache_fx(rate)
+            return rate
+    except Exception as e:
+        logger.warning("DuckDuckGo USD/PKR fallback failed: %s", e)
+
+    # 4. Stale 1h cache
     try:
         cached = await redis_client.get(_FX_CACHE_KEY)
         if cached:
@@ -68,7 +78,25 @@ async def get_usd_pkr_rate() -> Decimal:
     except Exception:
         pass
 
-    raise RuntimeError("Cannot fetch USD/PKR rate — no live or cached data available")
+    # 5. Persistent last-known-good (most recent real rate, ages gracefully)
+    try:
+        last_good = await redis_client.get(_FX_LAST_GOOD_KEY)
+        if last_good:
+            logger.warning("Using last-known-good USD/PKR rate: %s", last_good)
+            return Decimal(last_good)
+    except Exception:
+        pass
+
+    raise RuntimeError("Cannot fetch USD/PKR rate — no live, cached, or last-known-good data available")
+
+
+async def _cache_fx(rate: Decimal) -> None:
+    """Write the 1h cache + the persistent last-known-good rate."""
+    try:
+        await redis_client.setex(_FX_CACHE_KEY, _FX_CACHE_TTL, str(rate))
+        await redis_client.set(_FX_LAST_GOOD_KEY, str(rate))
+    except Exception:
+        pass
 
 
 async def get_sbp_rate() -> Decimal:
