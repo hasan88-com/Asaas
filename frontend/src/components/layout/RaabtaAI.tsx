@@ -78,16 +78,24 @@ export function RaabtaAI() {
     refreshConversations()
   }
 
-  async function send(text: string) {
+  async function send(text: string, opts?: { forceNew?: boolean }) {
     const msg = text.trim()
-    if (!msg || sending) return
+    if (!msg) return
+    // forceNew (e.g. an "Ask Raabta AI" button) always opens a fresh thread —
+    // abort any in-flight stream and ignore the current activeId, so it never
+    // appends to the conversation on screen.
+    if (opts?.forceNew) {
+      abortRef.current?.abort()
+    } else if (sending) {
+      return
+    }
     setInput('')
     setSending(true)
     setMessages((m) => [...m, { role: 'user', content: msg }, { role: 'assistant', content: '' }])
 
     try {
       // Ensure a conversation thread exists so the message is saved + titled.
-      let convId = activeId
+      let convId = opts?.forceNew ? null : activeId
       if (!convId) {
         const conv = await createConversation()
         convId = conv.id
@@ -137,7 +145,9 @@ export function RaabtaAI() {
         setActiveId(null)
         setMessages([])
         setShowList(false)
-        setTimeout(() => sendRef.current(msg), 60)
+        // forceNew: open a brand-new thread rather than appending to whatever
+        // conversation is currently on screen (avoids the activeId state race).
+        setTimeout(() => sendRef.current(msg, { forceNew: true }), 60)
       }
     }
     window.addEventListener('raabta:ask', handler)

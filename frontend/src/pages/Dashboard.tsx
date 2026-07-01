@@ -384,6 +384,14 @@ export default function Dashboard() {
                       const invested = qty != null && entry != null ? qty * entry : undefined
                       const pnl = hPerf && !hPerf.stale ? parseFloat(hPerf.pnl_pct) : undefined
                       const numFmt = (n?: number, d = 2) => n == null ? '—' : n.toLocaleString('en-PK', { maximumFractionDigits: d })
+                      // Quantity: 2 dp for whole-unit holdings (stocks, debt),
+                      // but keep meaningful digits for fractional crypto/commodity
+                      // (e.g. 0.000107 BTC) which 2 dp would collapse to "0".
+                      const fmtQty = (n?: number) =>
+                        n == null ? '—'
+                          : Math.abs(n) >= 1
+                            ? n.toLocaleString('en-PK', { maximumFractionDigits: 2 })
+                            : n.toLocaleString('en-PK', { maximumFractionDigits: 6 })
                       return (
                         <tr
                           key={h.symbol ?? h.instrument_id}
@@ -396,7 +404,7 @@ export default function Dashboard() {
                               <span className="font-sans text-[10px] text-ink-faint truncate max-w-[140px]">{h.name}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{numFmt(qty, 2)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{fmtQty(qty)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{numFmt(px ?? entry)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums font-medium">{value == null ? '—' : formatPkr(value)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums text-ink-soft">{invested == null ? '—' : formatPkr(invested)}</td>

@@ -10,6 +10,7 @@ class AgentState(TypedDict):
     """Immutable-friendly state passed between LangGraph nodes."""
 
     user_id: str                    # str(UUID) — for tool calls, never to LLM
+    conversation_id: Optional[str]  # str(UUID) or None — scopes loaded history to one thread
     user_message: str               # raw user input
     intent: str                     # filled by classify node
     context: Dict[str, Any]         # PII-free abstracted context for LLM prompts

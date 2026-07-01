@@ -84,7 +84,12 @@ export function MyActivity({
   }
 
   const sellable = holdings.filter((h) => h.id && (h.quantity ?? 0) > 0)
-  const fmtQty = (q: number) => q.toLocaleString('en-PK', { maximumFractionDigits: 2 })
+  // 2 dp for whole-unit holdings (stocks, debt); keep meaningful digits for
+  // fractional crypto/commodity that 2 dp would collapse to "0".
+  const fmtQty = (q: number) =>
+    Math.abs(q) >= 1
+      ? q.toLocaleString('en-PK', { maximumFractionDigits: 2 })
+      : q.toLocaleString('en-PK', { maximumFractionDigits: 6 })
   const holdingLabel = (h: HoldingResponse) =>
     `${h.symbol ?? h.name ?? '—'}${h.quantity != null ? ` · ${fmtQty(h.quantity)} units` : ''}`
 
@@ -214,6 +219,19 @@ export function MyActivity({
               </select>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => {
+              const message =
+                `Explain my risk profile: I have a ${riskTol} risk tolerance and a ${horizon} ` +
+                `investment horizon. What does that mean for how my portfolio should be built, ` +
+                `and is my current allocation aligned with it?`
+              window.dispatchEvent(new CustomEvent('raabta:ask', { detail: { message } }))
+            }}
+            className="self-start font-mono text-[11px] px-2.5 py-1 rounded-full bg-jade text-white hover:bg-jade-dark transition-colors btn-press"
+          >
+            💬 Ask Raabta AI
+          </button>
           <ActivityFooter error={error} submitting={submitting} disabled={false} onCancel={close} onSubmit={() =>
             run(() => putProfile({
               risk_tolerance: riskTol as ProfileResponse['risk_tolerance'],
