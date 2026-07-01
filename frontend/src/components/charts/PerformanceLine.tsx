@@ -10,6 +10,8 @@ import {
 } from 'chart.js'
 import type { TooltipItem } from 'chart.js'
 import { Line } from 'react-chartjs-2'
+import { useTheme } from '@/context/ThemeContext'
+import { cssVarRgb } from '@/lib/themeColor'
 
 ChartJS.register(LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler)
 
@@ -30,34 +32,36 @@ function fmtPKR(n: number): string {
   return `₨${n.toFixed(0)}`
 }
 
-function PerformanceLineImpl({ history, height = 240, lineColor = '#0F6E56' }: PerformanceLineProps) {
+function PerformanceLineImpl({ history, height = 240, lineColor }: PerformanceLineProps) {
+  const { theme } = useTheme()
+  const line = lineColor ?? cssVarRgb('--jade')
   const data = useMemo(() => {
     const labels = history.map((d) => {
       const dt = new Date(d.date)
       return dt.toLocaleDateString('en-PK', { month: 'short', day: 'numeric' })
     })
     const values = history.map((d) => parseFloat(d.value))
-    const fillColor = `${lineColor}1A`
+    const fillColor = cssVarRgb('--jade', 0.1)
 
     return {
       labels,
       datasets: [
         {
           data: values,
-          borderColor: lineColor,
+          borderColor: line,
           borderWidth: 2.5,
           tension: 0.35,
           fill: true,
           backgroundColor: fillColor,
           pointRadius: 0,
           pointHoverRadius: 5,
-          pointHoverBackgroundColor: lineColor,
-          pointHoverBorderColor: '#FFFEFB',
+          pointHoverBackgroundColor: line,
+          pointHoverBorderColor: cssVarRgb('--card'),
           pointHoverBorderWidth: 2,
         },
       ],
     }
-  }, [history, lineColor])
+  }, [history, line, theme])
 
   const options = useMemo(() => ({
     // Disabled so the chart never re-animates on a parent re-render (no flicker).
@@ -68,11 +72,11 @@ function PerformanceLineImpl({ history, height = 240, lineColor = '#0F6E56' }: P
     plugins: {
       legend: { display: false },
       tooltip: {
-        backgroundColor: '#16201C',
-        borderColor: '#DCD8CC',
+        backgroundColor: cssVarRgb('--ink'),
+        borderColor: cssVarRgb('--line'),
         borderWidth: 1,
-        titleColor: '#7C867F',
-        bodyColor: '#F6F4ED',
+        titleColor: cssVarRgb('--ink-faint'),
+        bodyColor: cssVarRgb('--paper'),
         titleFont: { family: '"IBM Plex Mono"', size: 11 },
         bodyFont: { family: '"IBM Plex Mono"', size: 13, weight: 500 as const },
         callbacks: {
@@ -85,23 +89,23 @@ function PerformanceLineImpl({ history, height = 240, lineColor = '#0F6E56' }: P
         grid: { display: false },
         border: { display: false },
         ticks: {
-          color: '#7C867F',
+          color: cssVarRgb('--ink-faint'),
           font: { family: '"IBM Plex Mono"', size: 11 },
           maxTicksLimit: 6,
         },
       },
       y: {
         position: 'left' as const,
-        grid: { color: '#DCD8CC', lineWidth: 1 },
+        grid: { color: cssVarRgb('--line'), lineWidth: 1 },
         border: { display: false, dash: [3, 3] },
         ticks: {
-          color: '#7C867F',
+          color: cssVarRgb('--ink-faint'),
           font: { family: '"IBM Plex Mono"', size: 11 },
           callback: (v: number | string) => fmtPKR(Number(v)),
         },
       },
     },
-  }), [])
+  }), [theme])
 
   if (history.length === 0) {
     return (

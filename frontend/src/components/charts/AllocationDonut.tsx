@@ -6,6 +6,8 @@ import {
   Tooltip,
 } from 'chart.js'
 import type { HoldingResponse } from '@/types/api'
+import { useTheme } from '@/context/ThemeContext'
+import { cssVarRgb } from '@/lib/themeColor'
 
 ChartJS.register(ArcElement, Tooltip)
 
@@ -74,6 +76,7 @@ function AllocationDonutImpl({
   centerLabel = 'Allocation',
   centerValue,
 }: AllocationDonutProps) {
+  const { theme } = useTheme()
   const chartData = useMemo(() => {
     // Explicit arrays win; otherwise derive from holdings.
     const finalLabels = labels ?? (holdings ?? []).map((h) => holdingLabel(h))
@@ -85,13 +88,15 @@ function AllocationDonutImpl({
         {
           data: finalData,
           backgroundColor: finalColors,
-          borderColor: '#FFFEFB',
+          // Segment separators match the card surface so they read as gaps in
+          // both light and dark themes (not white slivers on a dark card).
+          borderColor: cssVarRgb('--card'),
           borderWidth: 2,
           hoverOffset: 4,
         },
       ],
     }
-  }, [holdings, labels, data, colors])
+  }, [holdings, labels, data, colors, theme])
 
   const options = useMemo(() => ({
     cutout: '68%',

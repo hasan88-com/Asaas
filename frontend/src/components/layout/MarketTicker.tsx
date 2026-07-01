@@ -189,7 +189,7 @@ function Skeleton() {
             className="h-2.5 rounded"
             style={{
               width: `${w * 4}px`,
-              background: 'linear-gradient(90deg, #DCD8CC 25%, #E8E4D9 50%, #DCD8CC 75%)',
+              background: 'linear-gradient(90deg, rgb(var(--line)) 25%, rgb(var(--line-soft)) 50%, rgb(var(--line)) 75%)',
               backgroundSize: '400% 100%',
               animation: 'skeleton-shimmer 1.5s ease-in-out infinite',
             }}
@@ -248,29 +248,33 @@ export function MarketTicker() {
       aria-label="Live market ticker"
       aria-live="off"
     >
-      {/* Left/right fade edges — use card token (#FFFEFB) */}
+      {/* Left fade edge — theme-aware card colour */}
       <div
         className="absolute left-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to right, #FFFEFB 30%, transparent)' }}
-        aria-hidden
-      />
-      <div
-        className="absolute right-0 top-0 bottom-0 w-10 z-10 pointer-events-none"
-        style={{ background: 'linear-gradient(to left, #FFFEFB 30%, transparent)' }}
+        style={{ background: 'linear-gradient(to right, rgb(var(--card)) 30%, transparent)' }}
         aria-hidden
       />
 
-      {/* Stale indicator — always show when data exists, prominent when stale */}
+      {/* Stale indicator — always show when data exists, prominent when stale.
+       * Sits on an opaque card-coloured pill with a wide left fade so the
+       * scrolling ticker text disappears cleanly instead of overlapping it. */}
       {response?.as_of && (
-        <span
-          className={cn(
-            'absolute right-12 top-1/2 -translate-y-1/2 z-20 font-mono text-[9px] tracking-wide pointer-events-none',
-            response.stale ? 'text-loss/70' : 'text-ink-faint/50',
-          )}
-          aria-label={`Market data as of ${formatAsOf(response.as_of)}`}
-        >
-          as of {formatAsOf(response.as_of)}
-        </span>
+        <div className="absolute right-0 top-0 bottom-0 z-20 flex items-center pointer-events-none">
+          <div
+            className="w-14 h-full"
+            style={{ background: 'linear-gradient(to right, transparent, rgb(var(--card)) 70%)' }}
+            aria-hidden
+          />
+          <span
+            className={cn(
+              'bg-card pr-3 pl-1 h-full flex items-center font-mono text-[9px] tracking-wide whitespace-nowrap',
+              response.stale ? 'text-loss/70' : 'text-ink-faint/60',
+            )}
+            aria-label={`Market data as of ${formatAsOf(response.as_of)}`}
+          >
+            as of {formatAsOf(response.as_of)}
+          </span>
+        </div>
       )}
 
       {reduced ? (

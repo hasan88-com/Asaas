@@ -2,38 +2,78 @@
 @tailwind components;
 @tailwind utilities;
 
-/* CSS custom properties — DESIGN.md §9 warm paper palette */
+/* CSS custom properties — DESIGN.md §9 warm paper palette.
+ * Colours are stored as space-separated RGB channels so Tailwind can apply
+ * opacity modifiers (rgb(var(--x) / <alpha-value>)) and so a single [data-theme]
+ * switch re-themes every token-based class app-wide. */
 :root {
-  --paper: #F6F4ED;
-  --card: #FFFEFB;
-  --ink: #16201C;
-  --ink-soft: #4A564F;
-  --ink-faint: #7C867F;
-  --line: #DCD8CC;
-  --line-soft: #E8E4D9;
-  --jade: #0F6E56;
-  --jade-soft: #E1F1EA;
-  --gold: #B8801A;
-  --gold-soft: #F6ECD6;
-  --gain: #0F6E56;
-  --loss: #A8401F;
-  --loss-soft: #F6E3DA;
-  --info: #2F4858;
-  --info-soft: #E2E9EE;
-  --rose: #925B6A;
-  --rose-soft: #F2E4E8;
-  --plum: #5A3D6B;
-  --plum-soft: #EDE4F2;
-  --ac-stock: #0F6E56;
-  --ac-crypto: #5A3D6B;
-  --ac-tbill: #2F4858;
-  --ac-commodity: #B8801A;
-  --ac-fund: #3E7C8C;
+  --paper: 246 244 237;
+  --card: 255 254 251;
+  --ink: 22 32 28;
+  --ink-soft: 74 86 79;
+  --ink-faint: 124 134 127;
+  --line: 220 216 204;
+  --line-soft: 232 228 217;
+  --jade: 15 110 86;
+  --jade-soft: 225 241 234;
+  --jade-dark: 13 94 73;
+  --gold: 184 128 26;
+  --gold-soft: 246 236 214;
+  --gain: 15 110 86;
+  --loss: 168 64 31;
+  --loss-soft: 246 227 218;
+  --info: 47 72 88;
+  --info-soft: 226 233 238;
+  --rose: 146 91 106;
+  --rose-soft: 242 228 232;
+  --plum: 90 61 107;
+  --plum-soft: 237 228 242;
+  --ac-stock: 15 110 86;
+  --ac-crypto: 90 61 107;
+  --ac-tbill: 47 72 88;
+  --ac-commodity: 184 128 26;
+  --ac-fund: 62 124 140;
+
+  color-scheme: light;
 
   /* Easing tokens (DESIGN.md §5c, §6) */
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+/* Dark theme — warm charcoal surfaces, near-white warm text, brightened
+ * accents so every token stays legible on a dark background. Soft chip
+ * backgrounds (…-soft) become dark tints of their accent. */
+[data-theme='dark'] {
+  --paper: 18 21 18;
+  --card: 28 32 28;
+  --ink: 236 234 225;
+  --ink-soft: 178 184 176;
+  --ink-faint: 131 139 132;
+  --line: 46 51 46;
+  --line-soft: 38 43 38;
+  --jade: 41 175 133;
+  --jade-soft: 20 49 42;
+  --jade-dark: 32 140 107;
+  --gold: 214 154 42;
+  --gold-soft: 50 42 22;
+  --gain: 61 190 149;
+  --loss: 224 106 69;
+  --loss-soft: 58 33 26;
+  --info: 122 152 170;
+  --info-soft: 30 42 50;
+  --rose: 201 138 152;
+  --rose-soft: 50 35 41;
+  --plum: 168 138 190;
+  --plum-soft: 42 34 51;
+  --ac-stock: 41 175 133;
+  --ac-crypto: 168 138 190;
+  --ac-tbill: 122 152 170;
+  --ac-commodity: 214 154 42;
+  --ac-fund: 94 156 172;
+
+  color-scheme: dark;
 }
 
 @layer base {
@@ -43,8 +83,8 @@
 
   html {
     font-family: 'Inter', system-ui, sans-serif;
-    background-color: var(--paper);
-    color: var(--ink);
+    background-color: rgb(var(--paper));
+    color: rgb(var(--ink));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -52,7 +92,7 @@
   body {
     margin: 0;
     padding: 0;
-    background-color: var(--paper);
+    background-color: rgb(var(--paper));
   }
 
   /* All numbers tabular — DESIGN.md §3 */
@@ -109,7 +149,7 @@
 /* ------------------------------------------------------------------ */
 @layer base {
   :focus-visible {
-    outline: 2px solid var(--jade);
+    outline: 2px solid rgb(var(--jade));
     outline-offset: 2px;
   }
 }
@@ -143,7 +183,7 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--line);
+  background: rgb(var(--line));
   border-radius: 3px;
 }
 
@@ -151,7 +191,7 @@
 /* Skeleton loading — shimmer effect (DESIGN.md §5d.2)                  */
 /* ------------------------------------------------------------------ */
 .skeleton {
-  background: linear-gradient(90deg, var(--line-soft) 25%, var(--line) 50%, var(--line-soft) 75%);
+  background: linear-gradient(90deg, rgb(var(--line-soft)) 25%, rgb(var(--line)) 50%, rgb(var(--line-soft)) 75%);
   background-size: 200% 100%;
   animation: skeleton-shimmer 1.5s ease-in-out infinite;
   border-radius: var(--radius-sm, 6px);
@@ -203,8 +243,8 @@
   bottom: calc(100% + 8px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--ink);
-  color: var(--card);
+  background: rgb(var(--ink));
+  color: rgb(var(--card));
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 12px;
@@ -224,7 +264,7 @@
   left: 50%;
   transform: translateX(-50%);
   border: 5px solid transparent;
-  border-top-color: var(--ink);
+  border-top-color: rgb(var(--ink));
 }
 .tooltip-trigger:hover .tooltip-content,
 .tooltip-trigger:focus-within .tooltip-content {
@@ -281,7 +321,7 @@
   width: 80px;
   height: 80px;
   border-radius: 50%;
-  background: var(--jade-soft);
+  background: rgb(var(--jade-soft));
   display: flex;
   align-items: center;
   justify-content: center;
@@ -290,5 +330,5 @@
 .empty-state-icon svg {
   width: 36px;
   height: 36px;
-  color: var(--jade);
+  color: rgb(var(--jade));
 }

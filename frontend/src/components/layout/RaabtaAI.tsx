@@ -170,7 +170,7 @@ export function RaabtaAI() {
         .raabta-md { font-size:13px; line-height:1.5; }
         .raabta-md > *:first-child { margin-top:0; }
         .raabta-md > *:last-child { margin-bottom:0; }
-        .raabta-md h1,.raabta-md h2,.raabta-md h3 { font-size:12px; font-weight:600; margin:10px 0 4px; color:#16201C; text-transform:uppercase; letter-spacing:.04em; }
+        .raabta-md h1,.raabta-md h2,.raabta-md h3 { font-size:12px; font-weight:600; margin:10px 0 4px; color:rgb(var(--ink)); text-transform:uppercase; letter-spacing:.04em; }
         .raabta-md p { margin:4px 0; }
         .raabta-md ul { margin:4px 0; padding-left:16px; list-style:disc; }
         .raabta-md li { margin:2px 0; }
@@ -360,7 +360,7 @@ export function RaabtaAI() {
                 <button
                   type="submit"
                   disabled={sending || !input.trim()}
-                  className="w-9 h-9 rounded-full bg-jade text-white flex items-center justify-center disabled:opacity-40 hover:bg-[#0d5e49] transition-colors shrink-0"
+                  className="w-9 h-9 rounded-full bg-jade text-white flex items-center justify-center disabled:opacity-40 hover:bg-jade-dark transition-colors shrink-0"
                   aria-label="Send"
                 >
                   <SendIcon />

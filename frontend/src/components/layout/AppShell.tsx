@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Outlet, Link } from 'react-router-dom'
-import { User } from 'lucide-react'
+import { User, Sun, Moon } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { useTheme } from '@/context/ThemeContext'
 import { NavBar } from './NavBar'
 import { MarketTicker } from './MarketTicker'
 import { RaabtaAI } from './RaabtaAI'
@@ -10,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 export function AppShell() {
   const { user } = useAuth()
+  const { theme, toggleTheme } = useTheme()
   const [flagCount, setFlagCount] = useState(0)
 
   useEffect(() => {
@@ -26,8 +28,8 @@ export function AppShell() {
       <div className="sticky top-0 z-40">
         <MarketTicker />
 
-      {/* Top navigation bar */}
-      <header className="bg-card border-b border-line">
+      {/* Top navigation bar — glassmorphism: translucent, blurred, hairline edge */}
+      <header className="bg-card/70 backdrop-blur-xl border-b border-line/60 supports-[backdrop-filter]:bg-card/60">
         <div className="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
           {/* Wordmark */}
           <Link
@@ -41,19 +43,36 @@ export function AppShell() {
           {/* Desktop nav */}
           <NavBar flagCount={flagCount} variant="top" />
 
-          {/* Avatar */}
-          <Link
-            to="/settings"
-            className={cn(
-              'w-8 h-8 rounded-full bg-jade text-white flex items-center justify-center',
-              'font-mono text-[11px] font-semibold uppercase',
-              'focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2',
-              'hover:bg-[#0d5e49] transition-colors',
-            )}
-            aria-label="Settings"
-          >
-            {user?.email ? initials : <User size={14} />}
-          </Link>
+          <div className="flex items-center gap-2">
+            {/* Theme toggle */}
+            <button
+              type="button"
+              onClick={toggleTheme}
+              className={cn(
+                'w-8 h-8 rounded-full border border-line flex items-center justify-center text-ink-soft',
+                'hover:text-ink hover:border-jade/40 transition-colors',
+                'focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2',
+              )}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            >
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+
+            {/* Avatar */}
+            <Link
+              to="/settings"
+              className={cn(
+                'w-8 h-8 rounded-full bg-jade text-white flex items-center justify-center',
+                'font-mono text-[11px] font-semibold uppercase',
+                'focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2',
+                'hover:bg-jade-dark transition-colors',
+              )}
+              aria-label="Settings"
+            >
+              {user?.email ? initials : <User size={14} />}
+            </Link>
+          </div>
         </div>
       </header>
       </div>{/* end sticky band */}

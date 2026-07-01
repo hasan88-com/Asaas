@@ -2,6 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Apply the saved theme before first paint to avoid a light->dark flash.
+      (function () {
+        try {
+          var t = localStorage.getItem('asaas-theme');
+          if (t === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        } catch (e) {}
+      })();
+    </script>
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Asaasa · اثاثہ</title>
@@ -24,6 +33,7 @@
         background: #F6F4ED;
         transition: opacity 0.3s ease-out;
       }
+      html[data-theme='dark'] #screen-loader { background: #121512; }
       #screen-loader.fade-out {
         opacity: 0;
         pointer-events: none;
