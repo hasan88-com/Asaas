@@ -59,6 +59,7 @@ class Settings(BaseSettings):
     groq_api_key: str = ""
     cerebras_api_key: str = ""
     openrouter_api_key: str = ""
+    mistral_api_key: str = ""
 
     # --- Data Sources ---
     coingecko_api_key: str = ""
