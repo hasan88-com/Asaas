@@ -1,53 +1,55 @@
 /** @type {import('tailwindcss').Config} */
+const withVar = (v) => `rgb(var(${v}) / <alpha-value>)`
 export default {
   content: ['./index.html', './src/**/*.{ts,tsx}'],
+  darkMode: ['selector', "[data-theme='dark']"],
   theme: {
     extend: {
       colors: {
-        paper: '#F6F4ED',
-        card: '#FFFEFB',
+        paper: withVar('--paper'),
+        card: withVar('--card'),
         ink: {
-          DEFAULT: '#16201C',
-          soft: '#4A564F',
-          faint: '#7C867F',
+          DEFAULT: withVar('--ink'),
+          soft: withVar('--ink-soft'),
+          faint: withVar('--ink-faint'),
         },
         line: {
-          DEFAULT: '#DCD8CC',
-          soft: '#E8E4D9',
+          DEFAULT: withVar('--line'),
+          soft: withVar('--line-soft'),
         },
         jade: {
-          DEFAULT: '#0F6E56',
-          soft: '#E1F1EA',
-          dark: '#0d5e49',
+          DEFAULT: withVar('--jade'),
+          soft: withVar('--jade-soft'),
+          dark: withVar('--jade-dark'),
         },
         gold: {
-          DEFAULT: '#B8801A',
-          soft: '#F6ECD6',
+          DEFAULT: withVar('--gold'),
+          soft: withVar('--gold-soft'),
         },
-        gain: '#0F6E56',
+        gain: withVar('--gain'),
         loss: {
-          DEFAULT: '#A8401F',
-          soft: '#F6E3DA',
+          DEFAULT: withVar('--loss'),
+          soft: withVar('--loss-soft'),
         },
         info: {
-          DEFAULT: '#2F4858',
-          soft: '#E2E9EE',
+          DEFAULT: withVar('--info'),
+          soft: withVar('--info-soft'),
         },
         rose: {
-          DEFAULT: '#925B6A',
-          soft: '#F2E4E8',
+          DEFAULT: withVar('--rose'),
+          soft: withVar('--rose-soft'),
         },
         plum: {
-          DEFAULT: '#5A3D6B',
-          soft: '#EDE4F2',
+          DEFAULT: withVar('--plum'),
+          soft: withVar('--plum-soft'),
         },
-        neutral: '#4A564F',
+        neutral: withVar('--ink-soft'),
         ac: {
-          stock: '#0F6E56',
-          crypto: '#5A3D6B',
-          tbill: '#2F4858',
-          commodity: '#B8801A',
-          fund: '#3E7C8C',
+          stock: withVar('--ac-stock'),
+          crypto: withVar('--ac-crypto'),
+          tbill: withVar('--ac-tbill'),
+          commodity: withVar('--ac-commodity'),
+          fund: withVar('--ac-fund'),
         },
       },
       fontFamily: {

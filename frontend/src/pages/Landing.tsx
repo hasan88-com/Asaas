@@ -12,19 +12,19 @@ import { MarketTicker } from '@/components/layout/MarketTicker'
 const FAQ_ITEMS = [
   {
     q: 'What is Asaasa?',
-    a: "Asaasa is Pakistan's AI-powered wealth platform. It uses modern portfolio theory, live market data, and seven specialist AI agents to optimise, monitor, and explain your portfolio in plain language.",
+    a: "Asaasa is Pakistan's AI-powered wealth platform. It uses modern portfolio theory, live market data, and eight AI agents to optimise, monitor, and explain your portfolio in plain language.",
   },
   {
     q: 'Do I need to be an expert investor?',
-    a: 'No. Asaasa handles the complexity — risk profiling, optimisation, monitoring — and presents everything in plain language. You stay in control; the agent does the heavy lifting.',
+    a: 'No. Asaasa handles the complexity (risk profiling, optimisation, monitoring) and presents everything in plain language. You stay in control; the agent does the heavy lifting.',
   },
   {
     q: 'How does the AI agent work?',
-    a: 'Seven specialist roles (profiler, optimizer, valuation, technical, news, rate-impact, general chat) route your questions to the right expert. You just ask — in English or Urdu — and get structured, actionable answers.',
+    a: 'Eight AI roles (profiler, optimizer, valuation, technical, news, rate-impact, market sentiment, general chat) route your questions to the right expert. You just ask, in English or Urdu, and get structured, actionable answers.',
   },
   {
     q: 'Which markets do you cover?',
-    a: 'PSX stocks (KSE-100 and beyond), crypto (BTC, ETH, top 20), T-bills and SBP rates, commodities (gold, oil, silver), and mutual funds — with live pricing and news matched to your holdings.',
+    a: 'PSX stocks (KSE-100 and beyond), crypto (BTC, ETH, and other majors), T-bills, PIBs and SBP rates, commodities (gold and silver), and mutual funds, with live pricing and news matched to your holdings.',
   },
 ]
 
@@ -194,7 +194,7 @@ function TypingAgentChat() {
     800,
   )
   const agentMsg = useTypingAnimation(
-    "Yes — your portfolio is 70% concentrated in banking. I'd suggest rebalancing: moving 10% to commodities and 5% to T-bills would improve your Sharpe ratio from 0.82 to 1.14.",
+    "Yes, your portfolio is 70% concentrated in banking. I'd suggest rebalancing: moving 10% to commodities and 5% to T-bills would improve your Sharpe ratio from 0.82 to 1.14.",
     15,
     userMsg.length > 0 ? 800 + userMsg.length * 25 + 500 : 99999,
   )
@@ -224,7 +224,7 @@ function TypingAgentChat() {
           <div className="bg-ink-soft rounded-[10px] px-4 py-3 max-w-[85%]">
             <p className="font-sans text-[13px] text-paper leading-[1.5]">
               {agentMsg}
-              {agentMsg.length < "Yes — your portfolio is 70% concentrated in banking. I'd suggest rebalancing: moving 10% to commodities and 5% to T-bills would improve your Sharpe ratio from 0.82 to 1.14.".length && (
+              {agentMsg.length < "Yes, your portfolio is 70% concentrated in banking. I'd suggest rebalancing: moving 10% to commodities and 5% to T-bills would improve your Sharpe ratio from 0.82 to 1.14.".length && (
                 <span className="inline-block w-[2px] h-[14px] bg-paper ml-0.5 animate-pulse" />
               )}
             </p>
@@ -297,8 +297,8 @@ export default function Landing() {
               <span className="block text-[48px] md:text-[64px] text-jade">Asaasa.</span>
             </h1>
             <p className="font-sans text-[17px] leading-[1.6] text-ink-soft max-w-xl">
-              Pakistan's only agentic wealth platform — MPT optimisation, live PSX data,
-              SBP rate tracking, and seven specialist AI agents analysing your portfolio 24/7.
+              Pakistan's only agentic wealth platform. MPT optimisation, live PSX data,
+              SBP rate tracking, and eight AI agents analysing your portfolio 24/7.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link to="/try">
@@ -352,9 +352,9 @@ export default function Landing() {
           {[
             { value: '₨4.2T', label: 'PSX Market Cap' },
             { value: '580+', label: 'Listed Companies' },
-            { value: '7', label: 'AI Agent Roles' },
+            { value: '8', label: 'AI Agent Roles' },
             { value: '15', label: 'Analysis Tools' },
-            { value: '4', label: 'LLM Providers' },
+            { value: '3', label: 'LLM Providers' },
           ].map(({ value, label }) => (
             <div key={label} className="flex flex-col items-center gap-1">
               <span className="font-mono text-[22px] font-semibold text-ink tabular-nums">{value}</span>
@@ -427,8 +427,9 @@ export default function Landing() {
               AI Agents That<br />Understand Your Money
             </h2>
             <p className="font-sans text-[16px] leading-[1.6] text-ink-soft max-w-lg">
-              Seven specialist roles — profiler, optimizer, valuation, technical, news, rate-impact, and general chat —
-              route your questions to the right expert. Ask in English or Urdu; get structured, actionable answers.
+              Eight AI roles (profiler, optimizer, valuation, technical, news, rate-impact, market
+              sentiment, and general chat) route your questions to the right expert. Ask in English
+              or Urdu; get structured, actionable answers.
             </p>
             <Link to="/try" className="mt-2">
               <Button variant="outline" size="md" className="px-6 gap-2 font-mono uppercase tracking-[0.06em] text-[13px]">
@@ -456,9 +457,9 @@ export default function Landing() {
               { icon: Target, accent: 'text-gain', bg: 'bg-jade-soft', title: 'Goal Tracking', desc: 'Define financial goals and visualise progress with AI-powered projections and asset recommendations.' },
               { icon: RefreshCw, accent: 'text-info', bg: 'bg-info-soft', title: 'Automated Allocation', desc: 'MPT optimisation auto-allocates funds across asset types based on your risk profile and investment horizon.' },
               { icon: Brain, accent: 'text-plum', bg: 'bg-plum-soft', title: 'Risk Profiling', desc: 'Dynamic questionnaires assess your risk appetite and adjust portfolio recommendations instantly.' },
-              { icon: Eye, accent: 'text-gold', bg: 'bg-gold-soft', title: 'Real-Time Sync', desc: 'Live PSX, crypto, commodity, and T-bill pricing — your portfolio performance updates as markets move.' },
-              { icon: MessageCircle, accent: 'text-rose', bg: 'bg-rose-soft', title: 'Advisor Agent', desc: 'Seven specialist AI roles monitor, explain, and suggest — always one tap away in the dashboard.' },
-              { icon: FileText, accent: 'text-ac-fund', bg: 'bg-info-soft', title: 'Comprehensive Reporting', desc: 'Downloadable reports showing returns, historical trends, and asset exposure — instantly and securely.' },
+              { icon: Eye, accent: 'text-gold', bg: 'bg-gold-soft', title: 'Real-Time Sync', desc: 'Live PSX, crypto, commodity, and T-bill pricing. Your portfolio performance updates as markets move.' },
+              { icon: MessageCircle, accent: 'text-rose', bg: 'bg-rose-soft', title: 'Advisor Agent', desc: 'Eight AI roles monitor, explain, and suggest, always one tap away in the dashboard.' },
+              { icon: FileText, accent: 'text-ac-fund', bg: 'bg-info-soft', title: 'Comprehensive Reporting', desc: 'Downloadable reports showing returns, historical trends, and asset exposure, instantly and securely.' },
             ].map(({ icon: Icon, title, desc, accent, bg }) => (
               <div key={title} className="bg-card border border-line rounded-[10px] p-6 flex flex-col gap-4 group hover:border-jade/40 transition-colors">
                 <div className={cn('w-11 h-11 rounded-[10px] flex items-center justify-center', bg)}>
@@ -488,7 +489,7 @@ export default function Landing() {
               { step: '01', title: 'Sign up free', desc: 'Create an account in seconds. No card required.' },
               { step: '02', title: 'Tell us about you', desc: 'A quick risk-profiling questionnaire shapes your investor profile.' },
               { step: '03', title: 'Declare holdings', desc: 'Add your existing investments or start fresh with a suggested portfolio.' },
-              { step: '04', title: 'AI takes over', desc: 'Seven agents optimise, monitor, and explain — you stay in control.' },
+              { step: '04', title: 'AI takes over', desc: 'Eight agents optimise, monitor, and explain. You stay in control.' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col gap-3">
                 <span className="font-mono text-[32px] font-semibold text-jade/20 tabular-nums">{step}</span>
@@ -512,9 +513,9 @@ export default function Landing() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5">
             {[
               { icon: Zap, accent: 'text-gain', bg: 'bg-jade-soft', title: 'Start free', desc: "Full platform access without a credit card. Upgrade when you're ready." },
-              { icon: TrendingUp, accent: 'text-info', bg: 'bg-info-soft', title: 'PSX-native', desc: 'Built for KSE-100, SBP rates, and PKR — not a generic global tool.' },
+              { icon: TrendingUp, accent: 'text-info', bg: 'bg-info-soft', title: 'PSX-native', desc: 'Built for KSE-100, SBP rates, and PKR, not a generic global tool.' },
               { icon: Lock, accent: 'text-gold', bg: 'bg-gold-soft', title: 'Security-first', desc: 'Encrypted storage, row-level access, no PII to AI models. Your data stays yours.' },
-              { icon: MessageCircle, accent: 'text-plum', bg: 'bg-plum-soft', title: 'Agentic, not passive', desc: 'Seven AI agents actively monitor and explain — not just a static dashboard.' },
+              { icon: MessageCircle, accent: 'text-plum', bg: 'bg-plum-soft', title: 'Agentic, not passive', desc: 'Eight AI agents actively monitor and explain, not just a static dashboard.' },
             ].map(({ icon: Icon, title, desc, accent, bg }) => (
               <div key={title} className="bg-card border border-line rounded-[10px] p-6 flex flex-col gap-3">
                 <div className={cn('w-10 h-10 rounded-[8px] flex items-center justify-center', bg)}>

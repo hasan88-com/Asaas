@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import { useReducedMotion } from '@/hooks/useReducedMotion'
+import { useTheme } from '@/context/ThemeContext'
+import { cssVarRgb } from '@/lib/themeColor'
 
 interface MonteCarloRangeProps {
   p10: number
@@ -27,7 +29,12 @@ export function MonteCarloRange({
   height = 80,
 }: MonteCarloRangeProps) {
   const reduced = useReducedMotion()
+  useTheme() // subscribe so colours below re-resolve on light/dark toggle
   const lineRef = useRef<SVGLineElement>(null)
+
+  const bandFill = cssVarRgb('--info-soft')
+  const mutedStroke = cssVarRgb('--ink-faint')
+  const accent = cssVarRgb('--jade')
 
   const innerW = width - PAD.left - PAD.right
   const innerH = height - PAD.top - PAD.bottom
@@ -73,7 +80,7 @@ export function MonteCarloRange({
           width={xP90 - xP10}
           height={bandH}
           rx={4}
-          fill="#E2E9EE"
+          fill={bandFill}
         />
 
         {/* P50 tick */}
@@ -82,7 +89,7 @@ export function MonteCarloRange({
           y1={midY - bandH / 2 - 4}
           x2={xP50}
           y2={midY + bandH / 2 + 4}
-          stroke="#7C867F"
+          stroke={mutedStroke}
           strokeWidth={1}
           strokeDasharray="3 2"
         />
@@ -95,7 +102,7 @@ export function MonteCarloRange({
               y1={midY - bandH / 2 - 6}
               x2={xCurrent}
               y2={midY + bandH / 2 + 6}
-              stroke="#0F6E56"
+              stroke={accent}
               strokeWidth={2}
               strokeLinecap="round"
             />
@@ -103,14 +110,14 @@ export function MonteCarloRange({
         )}
 
         {/* Labels */}
-        <text x={xP10} y={innerH + 14} textAnchor="middle" fontSize={10} fill="#7C867F" fontFamily="IBM Plex Mono, monospace">
+        <text x={xP10} y={innerH + 14} textAnchor="middle" fontSize={10} fill={mutedStroke} fontFamily="IBM Plex Mono, monospace">
           {fmt(p10)}
         </text>
-        <text x={xP90} y={innerH + 14} textAnchor="middle" fontSize={10} fill="#7C867F" fontFamily="IBM Plex Mono, monospace">
+        <text x={xP90} y={innerH + 14} textAnchor="middle" fontSize={10} fill={mutedStroke} fontFamily="IBM Plex Mono, monospace">
           {fmt(p90)}
         </text>
         {xCurrent !== undefined && current !== undefined && (
-          <text x={xCurrent} y={PAD.top - 20} textAnchor="middle" fontSize={10} fill="#0F6E56" fontFamily="IBM Plex Mono, monospace">
+          <text x={xCurrent} y={PAD.top - 20} textAnchor="middle" fontSize={10} fill={accent} fontFamily="IBM Plex Mono, monospace">
             {fmt(current)}
           </text>
         )}

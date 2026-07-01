@@ -78,16 +78,24 @@ export function RaabtaAI() {
     refreshConversations()
   }
 
-  async function send(text: string) {
+  async function send(text: string, opts?: { forceNew?: boolean }) {
     const msg = text.trim()
-    if (!msg || sending) return
+    if (!msg) return
+    // forceNew (e.g. an "Ask Raabta AI" button) always opens a fresh thread —
+    // abort any in-flight stream and ignore the current activeId, so it never
+    // appends to the conversation on screen.
+    if (opts?.forceNew) {
+      abortRef.current?.abort()
+    } else if (sending) {
+      return
+    }
     setInput('')
     setSending(true)
     setMessages((m) => [...m, { role: 'user', content: msg }, { role: 'assistant', content: '' }])
 
     try {
       // Ensure a conversation thread exists so the message is saved + titled.
-      let convId = activeId
+      let convId = opts?.forceNew ? null : activeId
       if (!convId) {
         const conv = await createConversation()
         convId = conv.id
@@ -137,7 +145,9 @@ export function RaabtaAI() {
         setActiveId(null)
         setMessages([])
         setShowList(false)
-        setTimeout(() => sendRef.current(msg), 60)
+        // forceNew: open a brand-new thread rather than appending to whatever
+        // conversation is currently on screen (avoids the activeId state race).
+        setTimeout(() => sendRef.current(msg, { forceNew: true }), 60)
       }
     }
     window.addEventListener('raabta:ask', handler)
@@ -160,7 +170,7 @@ export function RaabtaAI() {
         .raabta-md { font-size:13px; line-height:1.5; }
         .raabta-md > *:first-child { margin-top:0; }
         .raabta-md > *:last-child { margin-bottom:0; }
-        .raabta-md h1,.raabta-md h2,.raabta-md h3 { font-size:12px; font-weight:600; margin:10px 0 4px; color:#16201C; text-transform:uppercase; letter-spacing:.04em; }
+        .raabta-md h1,.raabta-md h2,.raabta-md h3 { font-size:12px; font-weight:600; margin:10px 0 4px; color:rgb(var(--ink)); text-transform:uppercase; letter-spacing:.04em; }
         .raabta-md p { margin:4px 0; }
         .raabta-md ul { margin:4px 0; padding-left:16px; list-style:disc; }
         .raabta-md li { margin:2px 0; }
@@ -350,7 +360,7 @@ export function RaabtaAI() {
                 <button
                   type="submit"
                   disabled={sending || !input.trim()}
-                  className="w-9 h-9 rounded-full bg-jade text-white flex items-center justify-center disabled:opacity-40 hover:bg-[#0d5e49] transition-colors shrink-0"
+                  className="w-9 h-9 rounded-full bg-jade text-white flex items-center justify-center disabled:opacity-40 hover:bg-jade-dark transition-colors shrink-0"
                   aria-label="Send"
                 >
                   <SendIcon />

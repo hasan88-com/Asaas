@@ -52,7 +52,9 @@ async def _agent_sse_generator(
         try:
             async with async_session_factory() as db:
                 orchestrator = AgentOrchestrator(db)
-                response_text, agent_role = await orchestrator.process_message(user_id, user_message)
+                response_text, agent_role = await orchestrator.process_message(
+                    user_id, user_message, conversation_id
+                )
         except Exception as exc:
             logger.error("Orchestrator error for user %s: %s", user_id, exc)
             response_text = "I encountered an error. Please try again in a moment."

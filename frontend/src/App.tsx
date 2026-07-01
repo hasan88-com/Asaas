@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/context/AuthContext'
+import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthGuard } from '@/components/layout/AuthGuard'
 import { GuestGuard } from '@/components/layout/GuestGuard'
 import { AppShell } from '@/components/layout/AppShell'
@@ -43,6 +44,7 @@ function PageLoader() {
 
 export default function App() {
   return (
+    <ThemeProvider>
     <AuthProvider>
       <ErrorBoundary>
        <Suspense fallback={<PageLoader />}>
@@ -84,5 +86,6 @@ export default function App() {
        </Suspense>
       </ErrorBoundary>
     </AuthProvider>
+    </ThemeProvider>
   )
 }

@@ -161,12 +161,19 @@ class AgentOrchestrator:
             # Load recent conversation memory (newest last). Only role + content
             # is carried — tool_call payloads / absolute amounts stay out of the
             # LLM-bound history (RULES.md A1.2 abstraction discipline).
-            hist_res = await db.execute(
-                select(ChatMessage)
-                .where(ChatMessage.user_id == user_id)
-                .order_by(ChatMessage.created_at.desc())
-                .limit(HISTORY_WINDOW)
-            )
+            #
+            # Scope to the CURRENT conversation thread when one is supplied (the
+            # Raabta AI widget), so a follow-up like "explain this" reads only
+            # that thread's latest turns — not messages bleeding in from other
+            # conversations. Falls back to user-wide history when no thread id is
+            # given (the Chat page / useChat surface).
+            conversation_id = state.get("conversation_id")
+            hist_stmt = select(ChatMessage).order_by(ChatMessage.created_at.desc()).limit(HISTORY_WINDOW)
+            if conversation_id:
+                hist_stmt = hist_stmt.where(ChatMessage.conversation_id == UUID(conversation_id))
+            else:
+                hist_stmt = hist_stmt.where(ChatMessage.user_id == user_id)
+            hist_res = await db.execute(hist_stmt)
             state["history"] = [
                 {"role": m.role, "content": m.content}
                 for m in reversed(hist_res.scalars().all())
@@ -298,13 +305,17 @@ class AgentOrchestrator:
         "general": "chat",
     }
 
-    async def process_message(self, user_id: UUID, user_message: str) -> tuple[str, str]:
+    async def process_message(
+        self, user_id: UUID, user_message: str, conversation_id: UUID | None = None
+    ) -> tuple[str, str]:
         """
         Entry point called by the chat API.
-        Returns (response_text, agent_role).
+        Returns (response_text, agent_role). ``conversation_id`` scopes the
+        loaded history to a single thread when provided.
         """
         initial_state: AgentState = {
             "user_id": str(user_id),
+            "conversation_id": str(conversation_id) if conversation_id else None,
             "user_message": user_message,
             "intent": "",
             "context": {},

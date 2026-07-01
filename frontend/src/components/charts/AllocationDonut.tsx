@@ -6,6 +6,8 @@ import {
   Tooltip,
 } from 'chart.js'
 import type { HoldingResponse } from '@/types/api'
+import { useTheme } from '@/context/ThemeContext'
+import { cssVarRgb } from '@/lib/themeColor'
 
 ChartJS.register(ArcElement, Tooltip)
 
@@ -61,6 +63,8 @@ interface AllocationDonutProps {
   size?: number
   /** Center label override — defaults to "Allocation" */
   centerLabel?: string
+  /** Optional value shown under the center label (e.g. total portfolio value). */
+  centerValue?: string
 }
 
 function AllocationDonutImpl({
@@ -70,7 +74,9 @@ function AllocationDonutImpl({
   colors,
   size = 180,
   centerLabel = 'Allocation',
+  centerValue,
 }: AllocationDonutProps) {
+  const { theme } = useTheme()
   const chartData = useMemo(() => {
     // Explicit arrays win; otherwise derive from holdings.
     const finalLabels = labels ?? (holdings ?? []).map((h) => holdingLabel(h))
@@ -82,13 +88,15 @@ function AllocationDonutImpl({
         {
           data: finalData,
           backgroundColor: finalColors,
-          borderColor: '#FFFEFB',
+          // Segment separators match the card surface so they read as gaps in
+          // both light and dark themes (not white slivers on a dark card).
+          borderColor: cssVarRgb('--card'),
           borderWidth: 2,
           hoverOffset: 4,
         },
       ],
     }
-  }, [holdings, labels, data, colors])
+  }, [holdings, labels, data, colors, theme])
 
   const options = useMemo(() => ({
     cutout: '68%',
@@ -116,6 +124,12 @@ function AllocationDonutImpl({
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
           {centerLabel}
         </span>
+        {centerValue && (
+          <span className="font-display font-semibold text-ink leading-tight tabular-nums"
+            style={{ fontSize: Math.max(13, Math.round(size * 0.13)) }}>
+            {centerValue}
+          </span>
+        )}
       </div>
     </div>
   )
