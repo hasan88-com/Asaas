@@ -152,7 +152,10 @@ export function RaabtaAI() {
         @keyframes raabta-blink { 0%,90%,100%{opacity:1} 95%{opacity:.2} }
         @keyframes raabta-ring { 0%{transform:scale(1);opacity:.45} 100%{transform:scale(1.8);opacity:0} }
         @keyframes raabta-typing { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-4px);opacity:1} }
+        @keyframes raabta-shimmer { 0%,100%{opacity:.4} 50%{opacity:1} }
+        @keyframes raabta-spin { to{transform:rotate(360deg)} }
         .raabta-dot { width:6px;height:6px;border-radius:9999px;background:#0F6E56;display:inline-block; }
+        .raabta-shimmer { animation: raabta-shimmer 1.3s ease-in-out infinite; }
         /* Compact, aligned markdown inside the chat bubble */
         .raabta-md { font-size:13px; line-height:1.5; }
         .raabta-md > *:first-child { margin-top:0; }
@@ -171,15 +174,15 @@ export function RaabtaAI() {
           type="button"
           onClick={() => setOpen(true)}
           aria-label="Open Raabta AI"
-          className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-jade text-white shadow-lg flex items-center justify-center hover:bg-[#0d5e49] transition-colors focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2"
+          className="fixed bottom-5 right-5 z-50 w-14 h-14 rounded-full bg-white shadow-lg flex items-center justify-center border border-line hover:shadow-xl transition-shadow focus-visible:outline-2 focus-visible:outline-jade focus-visible:outline-offset-2"
           style={{ animation: 'raabta-float 3s ease-in-out infinite' }}
         >
           <span
-            className="absolute inset-0 rounded-full bg-jade"
+            className="absolute inset-0 rounded-full bg-jade/40"
             style={{ animation: 'raabta-ring 2.4s ease-out infinite' }}
             aria-hidden
           />
-          <BotFace className="relative w-7 h-7" />
+          <img src="/logo.png" alt="Raabta AI" className="relative w-9 h-9 object-contain" />
         </button>
       )}
 
@@ -212,7 +215,9 @@ export function RaabtaAI() {
               >
                 <MenuIcon />
               </button>
-              <BotFace className="w-6 h-6 text-jade" />
+              <span className="w-6 h-6 rounded-full bg-white flex items-center justify-center shrink-0">
+                <img src="/logo.png" alt="" className="w-5 h-5 object-contain" />
+              </span>
               <span className="font-display text-[15px] font-semibold">Raabta AI</span>
             </div>
             <div className="flex items-center gap-1">
@@ -307,7 +312,7 @@ export function RaabtaAI() {
                         )}
                       >
                         {empty ? (
-                          <TypingDots />
+                          <ThinkingIndicator />
                         ) : m.role === 'assistant' ? (
                           <div className="raabta-md">
                             <ReactMarkdown>{m.content}</ReactMarkdown>
@@ -366,7 +371,7 @@ export function RaabtaAI() {
 
 function TypingDots() {
   return (
-    <span className="flex items-center gap-1 py-0.5" aria-label="Raabta AI is typing">
+    <span className="flex items-center gap-1 py-0.5" aria-label="typing">
       {[0, 1, 2].map((i) => (
         <span
           key={i}
@@ -378,15 +383,25 @@ function TypingDots() {
   )
 }
 
-function BotFace({ className }: { className?: string }) {
+function ThinkingIndicator() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden>
-      <circle cx="12" cy="4" r="1.4" fill="currentColor" style={{ animation: 'raabta-blink 4s infinite' }} />
-      <line x1="12" y1="5.4" x2="12" y2="7" stroke="currentColor" strokeWidth="1.5" />
-      <rect x="4" y="7" width="16" height="12" rx="5" fill="currentColor" />
-      <circle cx="9" cy="13" r="1.6" fill="#FFFEFB" />
-      <circle cx="15" cy="13" r="1.6" fill="#FFFEFB" />
-    </svg>
+    <span className="flex items-center gap-2" aria-label="Raabta AI is thinking">
+      <span className="relative w-5 h-5 shrink-0 flex items-center justify-center">
+        <span
+          className="absolute inset-0 rounded-full bg-jade/30"
+          style={{ animation: 'raabta-ring 1.6s ease-out infinite' }}
+          aria-hidden
+        />
+        <img
+          src="/logo.png"
+          alt=""
+          className="relative w-5 h-5 object-contain"
+          style={{ animation: 'raabta-float 2s ease-in-out infinite' }}
+        />
+      </span>
+      <span className="raabta-shimmer font-sans text-[12px] text-ink-soft">Thinking</span>
+      <TypingDots />
+    </span>
   )
 }
 
