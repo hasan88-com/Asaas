@@ -511,6 +511,19 @@ async def run_dcf(
             ),
         }
 
+    # Non-positive free cash flow → a growing-perpetuity DCF is meaningless
+    # (it just produces a negative "intrinsic value"). Skip it and let the
+    # relative valuation (industry-P/E × EPS) carry the answer.
+    if fcf <= 0:
+        return {
+            "insufficient_data": True,
+            "reason": (
+                "DCF not meaningful for this ticker — trailing free cash flow is "
+                "negative/zero, so a discounted-cash-flow intrinsic value would be "
+                "misleading. Relative valuation (sector P/E × EPS) is used instead."
+            ),
+        }
+
     # Shares outstanding
     shares = _to_decimal(info.get("sharesOutstanding")) or _SHARES_FALLBACK
 
@@ -554,6 +567,18 @@ async def run_dcf(
 
     equity_value = enterprise_value - net_debt
     intrinsic_value_per_share = equity_value / shares if shares > 0 else Decimal("0")
+
+    # A non-positive intrinsic value (heavy net debt, thin FCF, high PSX WACC) is
+    # not a usable valuation — suppress it so the relative valuation leads.
+    if intrinsic_value_per_share <= 0:
+        return {
+            "insufficient_data": True,
+            "reason": (
+                "DCF produced a non-positive intrinsic value for this ticker (high "
+                "WACC / net debt vs. modest cash flows), so it isn't a reliable "
+                "estimate here. Relative valuation (sector P/E × EPS) is used instead."
+            ),
+        }
 
     return {
         "intrinsic_value_per_share": str(intrinsic_value_per_share.quantize(Decimal("0.01"))),
