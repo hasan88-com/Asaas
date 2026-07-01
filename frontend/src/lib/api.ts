@@ -201,36 +201,44 @@ export async function streamChat(
   const decoder = new TextDecoder()
   let buffer = ''
 
+  const processChunk = (chunk: string) => {
+    if (!chunk.startsWith('data:')) return
+    const raw = chunk.slice('data:'.length).trim()
+    if (!raw) return
+
+    let evt: SSEEvent
+    try {
+      evt = JSON.parse(raw) as SSEEvent
+    } catch {
+      return
+    }
+
+    if (evt.event === 'tool') {
+      handlers.onTool?.(evt.tool, evt.status)
+    } else if (evt.event === 'content') {
+      handlers.onContent?.(evt.delta)
+    } else if (evt.event === 'done') {
+      handlers.onDone?.(evt.agentRole)
+    } else if (evt.event === 'error') {
+      throw new Error(evt.message ?? 'Stream error')
+    }
+  }
+
   while (true) {
     const { done, value } = await reader.read()
-    if (done) break
+    if (done) {
+      // Flush any trailing frame: the final 'done' event may arrive without a
+      // closing '\n\n', which would otherwise leave it unparsed in the buffer
+      // and the message stuck in its streaming (plain-text) render state.
+      if (buffer.trim()) processChunk(buffer.trim())
+      break
+    }
     buffer += decoder.decode(value, { stream: true })
 
     const chunks = buffer.split('\n\n')
     buffer = chunks.pop() ?? ''
 
-    for (const chunk of chunks) {
-      if (!chunk.startsWith('data:')) continue
-      const raw = chunk.slice('data:'.length).trim()
-      if (!raw) continue
-
-      let evt: SSEEvent
-      try {
-        evt = JSON.parse(raw) as SSEEvent
-      } catch {
-        continue
-      }
-
-      if (evt.event === 'tool') {
-        handlers.onTool?.(evt.tool, evt.status)
-      } else if (evt.event === 'content') {
-        handlers.onContent?.(evt.delta)
-      } else if (evt.event === 'done') {
-        handlers.onDone?.(evt.agentRole)
-      } else if (evt.event === 'error') {
-        throw new Error(evt.message ?? 'Stream error')
-      }
-    }
+    for (const chunk of chunks) processChunk(chunk)
   }
 }
 
