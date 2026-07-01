@@ -35,6 +35,25 @@ function inferAssetClass(sym: string): string | undefined {
   return undefined
 }
 
+/** Market cap → abbreviated PKR to 2 decimals (₨1.23T / ₨45.60B / ₨9.80M). */
+function fmtMarketCap(v?: string | null): string {
+  if (v == null || v === '') return '—'
+  const n = parseFloat(v)
+  if (!isFinite(n)) return '—'
+  const abs = Math.abs(n)
+  if (abs >= 1e12) return `₨${(n / 1e12).toFixed(2)}T`
+  if (abs >= 1e9) return `₨${(n / 1e9).toFixed(2)}B`
+  if (abs >= 1e6) return `₨${(n / 1e6).toFixed(2)}M`
+  return `₨${n.toLocaleString('en-PK', { maximumFractionDigits: 2 })}`
+}
+
+/** Beta → 2 decimals (or em dash when absent/non-numeric). */
+function fmtBeta(v?: string | null): string {
+  if (v == null || v === '') return '—'
+  const n = parseFloat(v)
+  return isFinite(n) ? n.toFixed(2) : '—'
+}
+
 export default function HoldingDetail() {
   const { symbol: rawSymbol } = useParams<{ symbol: string }>()
   // Reject empty params AND the literal "null"/"undefined" strings that result
@@ -179,6 +198,24 @@ export default function HoldingDetail() {
 
   if (!symbol) return null
 
+  // Hand the current analysis to Raabta AI for a plain-language explanation —
+  // mirrors the News page's "Affect on my portfolio?" (dispatches raabta:ask).
+  const askRaabta = (topic: 'valuation' | 'technical') => {
+    const name = company?.name || symbol
+    const message =
+      topic === 'valuation'
+        ? `Explain the valuation of ${name} (${symbol}) in simple terms — what do the ` +
+          `numbers mean (fair value, P/E, DCF or yield-to-maturity), and does it look ` +
+          `over- or under-valued? Also tell me whether I hold it and its role in my portfolio.`
+        : `Explain the technical analysis of ${name} (${symbol}) in simple terms — what do ` +
+          `the indicators (RSI, MACD, moving averages and any crossover signals) suggest, ` +
+          `and what should I watch? Also tell me whether I hold it.`
+    window.dispatchEvent(new CustomEvent('raabta:ask', { detail: { message } }))
+  }
+
+  const askButtonClass =
+    'mt-4 font-mono text-[12px] px-3 py-1.5 rounded-full bg-jade text-white hover:bg-jade-dark transition-colors btn-press'
+
   return (
     <div className="flex flex-col gap-6">
       {/* Header */}
@@ -295,8 +332,8 @@ export default function HoldingDetail() {
           ) : company ? (
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               {[
-                { label: 'Market cap', value: company.market_cap ? `₨${company.market_cap}` : '—' },
-                { label: 'Beta', value: company.beta ?? '—' },
+                { label: 'Market cap', value: fmtMarketCap(company.market_cap) },
+                { label: 'Beta', value: fmtBeta(company.beta) },
                 { label: 'Sector', value: company.sector ?? '—' },
               ].map(({ label, value }) => (
                 <div key={label} className="bg-card border border-line rounded-[8px] p-4 flex flex-col gap-1">
@@ -324,6 +361,11 @@ export default function HoldingDetail() {
             <p className="font-sans text-[14px] text-loss" role="alert">{valuationError}</p>
           )}
           {valuation && <ValuationCard data={valuation} className="max-w-none" />}
+          {valuation && (
+            <button type="button" onClick={() => askRaabta('valuation')} className={askButtonClass}>
+              💬 Explain this with Raabta AI
+            </button>
+          )}
         </div>
       )}
 
@@ -341,6 +383,11 @@ export default function HoldingDetail() {
             <p className="font-sans text-[14px] text-ink-faint">{technical.reason}</p>
           ) : (
             technical && <TechnicalCard data={technical} className="max-w-none" />
+          )}
+          {technical && !technical.disabled && (
+            <button type="button" onClick={() => askRaabta('technical')} className={askButtonClass}>
+              💬 Explain this with Raabta AI
+            </button>
           )}
         </div>
       )}

@@ -84,8 +84,9 @@ export function MyActivity({
   }
 
   const sellable = holdings.filter((h) => h.id && (h.quantity ?? 0) > 0)
+  const fmtQty = (q: number) => q.toLocaleString('en-PK', { maximumFractionDigits: 2 })
   const holdingLabel = (h: HoldingResponse) =>
-    `${h.symbol ?? h.name ?? '—'}${h.quantity != null ? ` · ${h.quantity} units` : ''}`
+    `${h.symbol ?? h.name ?? '—'}${h.quantity != null ? ` · ${fmtQty(h.quantity)} units` : ''}`
 
   const buyValid = !!buySymbol.trim() && parseFloat(buyQty) > 0 && parseFloat(buyPrice) >= 0
   const sellValid = !!sellId && parseFloat(sellQty) > 0 && parseFloat(sellPrice) >= 0
@@ -184,7 +185,7 @@ export function MyActivity({
                     }))}
                     className="self-start font-mono text-[12px] text-loss hover:underline disabled:opacity-50"
                   >
-                    Liquidate entire holding ({sel.quantity} units)
+                    Liquidate entire holding ({fmtQty(sel.quantity ?? 0)} units)
                   </button>
                 ) : null
               })()}
