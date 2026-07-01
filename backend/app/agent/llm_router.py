@@ -29,6 +29,7 @@ logger = logging.getLogger("asaas.agent.llm_router")
 _groq: AsyncGroq | None = None
 _cerebras: AsyncOpenAI | None = None
 _openrouter: AsyncOpenAI | None = None
+_mistral: AsyncOpenAI | None = None
 
 
 def _groq_client() -> AsyncGroq:
@@ -58,26 +59,43 @@ def _openrouter_client() -> AsyncOpenAI:
     return _openrouter
 
 
+def _mistral_client() -> AsyncOpenAI:
+    global _mistral
+    if _mistral is None:
+        _mistral = AsyncOpenAI(
+            base_url="https://api.mistral.ai/v1",  # Mistral is OpenAI-compatible
+            api_key=get_settings().mistral_api_key,
+        )
+    return _mistral
+
+
 # ── Task → provider chain ─────────────────────────────────────────────────────
 
+# Load is SPREAD across Groq and Mistral (both free tiers) so neither hits its
+# limits: light/reasoning run Groq-first (fast Llama), chat/hard run Mistral-first.
+# Each chain then falls back to the OTHER of the two, and finally Gemini — so a
+# single provider's quota/429 never takes a task down. (Missing keys fail-fast +
+# are skipped.)
 TASK_CHAINS: dict[str, list[dict]] = {
-    "light": [
-        {"provider": "groq",   "model": "llama-3.1-8b-instant"},
-        {"provider": "gemini", "model": "gemini-2.5-flash"},
+    "light": [  # intent classification — Groq 8b is fastest/cheapest
+        {"provider": "groq",    "model": "llama-3.1-8b-instant"},
+        {"provider": "mistral", "model": "mistral-small-latest"},
+        {"provider": "gemini",  "model": "gemini-2.5-flash"},
     ],
     "chat": [
-        {"provider": "groq",     "model": "llama-3.3-70b-specdec"},
-        {"provider": "cerebras", "model": "llama3.3-70b"},
-        {"provider": "gemini",   "model": "gemini-2.5-flash"},
+        {"provider": "mistral", "model": "mistral-small-latest"},
+        {"provider": "groq",    "model": "llama-3.3-70b-versatile"},
+        {"provider": "gemini",  "model": "gemini-2.5-flash"},
     ],
     "reasoning": [
-        {"provider": "gemini", "model": "gemini-2.5-flash"},
-        {"provider": "groq",   "model": "llama-3.3-70b-specdec"},
+        {"provider": "groq",    "model": "llama-3.3-70b-versatile"},
+        {"provider": "mistral", "model": "mistral-small-latest"},
+        {"provider": "gemini",  "model": "gemini-2.5-flash"},
     ],
     "hard": [
-        {"provider": "gemini",     "model": "gemini-2.5-pro"},
-        {"provider": "gemini",     "model": "gemini-2.5-flash"},
-        {"provider": "openrouter", "model": "google/gemini-2.5-pro"},
+        {"provider": "mistral", "model": "mistral-small-latest"},
+        {"provider": "groq",    "model": "llama-3.3-70b-versatile"},
+        {"provider": "gemini",  "model": "gemini-2.5-pro"},
     ],
 }
 
@@ -135,6 +153,8 @@ async def _call_provider(provider: str, model: str, system: str, user: str) -> s
         return await _call_openai_compat(_cerebras_client(), model, system, user)
     if provider == "openrouter":
         return await _call_openai_compat(_openrouter_client(), model, system, user)
+    if provider == "mistral":
+        return await _call_openai_compat(_mistral_client(), model, system, user)
     if provider == "gemini":
         return await _call_gemini(model, system, user)
     raise ValueError(f"Unknown provider: {provider}")
@@ -149,6 +169,9 @@ async def _stream_provider(provider: str, model: str, system: str, user: str):
             yield chunk
     elif provider == "openrouter":
         async for chunk in _stream_openai_compat(_openrouter_client(), model, system, user):
+            yield chunk
+    elif provider == "mistral":
+        async for chunk in _stream_openai_compat(_mistral_client(), model, system, user):
             yield chunk
     elif provider == "gemini":
         async for chunk in _stream_gemini(model, system, user):
