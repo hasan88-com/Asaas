@@ -130,6 +130,19 @@ async def _do_fetch_fundamentals(symbol: str, cached: Optional[Dict[str, Any]]) 
         logger.warning("yfinance fundamentals fetch failed for %s: %s", symbol, exc)
 
     info = info or {}
+    # PSX official fundamentals (dps.psx.com.pk) for .KA — authoritative P/E, EPS,
+    # price, market cap, shares. Works for ANY listed ticker (incl. ones yfinance
+    # can't serve) and isn't blocked on cloud IPs, so it fills/overrides the (often
+    # stale or missing) yfinance `info`. Statements still come from yfinance/DB.
+    if symbol.upper().endswith(".KA"):
+        try:
+            from app.data.adapters.psx_fundamentals_adapter import fetch_psx_fundamentals
+            dps = await fetch_psx_fundamentals(symbol)
+            if dps:
+                info = {**info, **{k: v for k, v in dps.items() if v is not None}}
+        except Exception as exc:
+            logger.warning("PSX (dps) fundamentals failed for %s: %s", symbol, exc)
+
     # A fetch only counts as "complete" when it brought financial statements.
     # On a throttled cloud IP (Render) Yahoo often returns a price-only / empty
     # response; treating that as success would persist a thin bundle OVER the
@@ -164,18 +177,9 @@ async def _do_fetch_fundamentals(symbol: str, cached: Optional[Dict[str, Any]]) 
         stale = dict(cached); stale["stale"] = True
         return stale
 
-    # Last resort: DuckDuckGo web search for P/E / EPS (best-effort, long tail).
-    if not info.get("trailingPE"):
-        try:
-            from app.data.adapters.fundamentals_search_adapter import fetch_fundamentals_via_search
-            ddg = await fetch_fundamentals_via_search(symbol)
-            if ddg:
-                info = {**info, **ddg}
-        except Exception as exc:
-            logger.warning("DuckDuckGo fundamentals fallback failed for %s: %s", symbol, exc)
-
-    # Return whatever info we have (P/E may still resolve), and seed it so a later
-    # request has something to merge onto.
+    # Return whatever info we have — for .KA the dps merge above already provides
+    # P/E / EPS / price, so multiples + the industry-P/E × EPS verdict resolve even
+    # with no statements. Seed it so a later request has something to merge onto.
     bundle = {"info": info, "income": income, "cashflow": cashflow, "balance": balance, "fetched_at": now, "stale": True}
     if info:
         await _persist_fundamentals(symbol, bundle)
