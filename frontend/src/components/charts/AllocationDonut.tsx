@@ -61,6 +61,8 @@ interface AllocationDonutProps {
   size?: number
   /** Center label override — defaults to "Allocation" */
   centerLabel?: string
+  /** Optional value shown under the center label (e.g. total portfolio value). */
+  centerValue?: string
 }
 
 function AllocationDonutImpl({
@@ -70,6 +72,7 @@ function AllocationDonutImpl({
   colors,
   size = 180,
   centerLabel = 'Allocation',
+  centerValue,
 }: AllocationDonutProps) {
   const chartData = useMemo(() => {
     // Explicit arrays win; otherwise derive from holdings.
@@ -116,6 +119,12 @@ function AllocationDonutImpl({
         <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">
           {centerLabel}
         </span>
+        {centerValue && (
+          <span className="font-display font-semibold text-ink leading-tight tabular-nums"
+            style={{ fontSize: Math.max(13, Math.round(size * 0.13)) }}>
+            {centerValue}
+          </span>
+        )}
       </div>
     </div>
   )
