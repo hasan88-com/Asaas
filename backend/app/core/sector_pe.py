@@ -41,6 +41,15 @@ _SECTOR_PE = [
     (("paper", "board"), Decimal("8.0")),
     (("glass", "ceramic"), Decimal("9.0")),
     (("leather", "tanneries"), Decimal("7.0")),
+    (("investment bank", "securities", "brokerage", "inv. cos"), Decimal("8.0")),
+    (("transport", "shipping", "airline", "logistics"), Decimal("8.0")),
+    (("conglomerate", "holding"), Decimal("8.0")),
+    (("engineering", "steel", "iron"), Decimal("9.0")),
+    (("cable", "electrical goods"), Decimal("9.0")),
+    (("packaging",), Decimal("8.0")),
+    (("synthetic", "rayon"), Decimal("7.0")),
+    (("vanaspati",), Decimal("8.0")),
+    (("miscellaneous",), Decimal("10.0")),
 ]
 
 
