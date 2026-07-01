@@ -72,9 +72,14 @@ async def run_valuation(
     if not symbol:
         state["response"] = (
             "Please name the company or ticker you'd like valued "
-            "(e.g. 'value HBL' or 'DCF on OGDC' or 'analyse AAPL')."
+            "(e.g. 'value HBL' or 'DCF on OGDC' or 'tell me about PSO')."
         )
         return state
+
+    # Normalise to the PSX .KA form so ALL tools (incl. company_info) hit the
+    # dps/PSX fundamentals source, not a foreign yfinance ticker.
+    from app.services.valuation import _yf_equity_symbol
+    symbol = _yf_equity_symbol(symbol)
 
     logger.info("Running valuation for symbol=%s", symbol)
 
