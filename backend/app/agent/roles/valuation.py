@@ -40,6 +40,50 @@ _PSX_TICKERS = frozenset({
 })
 
 
+# Uppercase finance acronyms that are NOT tickers — don't mistake them for one.
+_CONCEPT_WORDS = frozenset({
+    "WACC", "DCF", "EPS", "PE", "PB", "PEG", "ROE", "ROA", "ROI", "EBITDA", "EV",
+    "IPO", "ETF", "NAV", "YTD", "TTM", "GDP", "CPI", "SBP", "PSX", "KSE", "KMI",
+    "MPT", "CAPM", "ERP", "FCF", "YTM", "DV01", "RSI", "MACD", "MFI", "AI",
+})
+
+
+async def _portfolio_context(db: AsyncSession, user_id, symbol: str) -> dict:
+    """Whether `symbol` is in the user's active portfolio, and its weight — so the
+    answer can say if the user actually holds it and its role in their allocation."""
+    if not user_id:
+        return {"held": False}
+    try:
+        from uuid import UUID
+        from sqlalchemy import select
+        from app.models.portfolio import Portfolio
+        from app.models.holding import Holding
+        from app.models.instrument import Instrument
+
+        uid = user_id if isinstance(user_id, UUID) else UUID(str(user_id))
+        port = (await db.execute(
+            select(Portfolio).where(Portfolio.user_id == uid, Portfolio.status != "draft")
+            .order_by(Portfolio.confirmed_at.desc())
+        )).scalars().first()
+        if port is None:
+            return {"held": False, "has_portfolio": False}
+        rows = (await db.execute(
+            select(Holding, Instrument).join(Instrument, Instrument.id == Holding.instrument_id)
+            .where(Holding.portfolio_id == port.id)
+        )).all()
+        target = symbol.upper()
+        total = sum(float(h.actual_weight or 0) for h, _ in rows) or 1.0
+        for h, inst in rows:
+            if (inst.symbol or "").upper() == target:
+                w = float(h.actual_weight or 0)
+                return {"held": True, "weight_pct": round(w / total * 100, 1) if total else None,
+                        "quantity": str(h.quantity)}
+        return {"held": False, "has_portfolio": True}
+    except Exception as exc:
+        logger.warning("portfolio_context failed for %s: %s", symbol, exc)
+        return {"held": False}
+
+
 def _extract_symbol(message: str) -> Optional[str]:
     """
     Parse equity ticker from natural-language message.
@@ -52,6 +96,8 @@ def _extract_symbol(message: str) -> Optional[str]:
 
     bare = re.findall(r"\b([A-Z]{2,6})\b", message)
     for candidate in bare:
+        if candidate in _CONCEPT_WORDS:      # finance terms, not tickers
+            continue
         if candidate in _PSX_TICKERS:
             return f"{candidate}.KA"
         if len(candidate) >= 2:
@@ -100,6 +146,7 @@ async def run_valuation(
         "dcf": _safe(dcf, "dcf"),
         "monte_carlo": _safe(mc, "monte_carlo"),
         "multiples": _safe(mult, "multiples"),
+        "portfolio_context": await _portfolio_context(db, state.get("user_id"), symbol),
     }
 
     user_content = "\n\n".join(p for p in [

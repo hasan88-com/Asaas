@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import ReactMarkdown from 'react-markdown'
 import { cn } from '@/lib/utils'
 import {
   streamChat,
@@ -150,6 +151,18 @@ export function RaabtaAI() {
         @keyframes raabta-float { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-4px)} }
         @keyframes raabta-blink { 0%,90%,100%{opacity:1} 95%{opacity:.2} }
         @keyframes raabta-ring { 0%{transform:scale(1);opacity:.45} 100%{transform:scale(1.8);opacity:0} }
+        @keyframes raabta-typing { 0%,60%,100%{transform:translateY(0);opacity:.4} 30%{transform:translateY(-4px);opacity:1} }
+        .raabta-dot { width:6px;height:6px;border-radius:9999px;background:#0F6E56;display:inline-block; }
+        /* Compact, aligned markdown inside the chat bubble */
+        .raabta-md { font-size:13px; line-height:1.5; }
+        .raabta-md > *:first-child { margin-top:0; }
+        .raabta-md > *:last-child { margin-bottom:0; }
+        .raabta-md h1,.raabta-md h2,.raabta-md h3 { font-size:12px; font-weight:600; margin:10px 0 4px; color:#16201C; text-transform:uppercase; letter-spacing:.04em; }
+        .raabta-md p { margin:4px 0; }
+        .raabta-md ul { margin:4px 0; padding-left:16px; list-style:disc; }
+        .raabta-md li { margin:2px 0; }
+        .raabta-md strong { font-weight:600; }
+        .raabta-md hr { display:none; }
       `}</style>
 
       {/* Floating launcher */}
@@ -281,19 +294,30 @@ export function RaabtaAI() {
                     </div>
                   </div>
                 ) : (
-                  messages.map((m, i) => (
-                    <div
-                      key={i}
-                      className={cn(
-                        'max-w-[85%] px-3 py-2 rounded-[10px] text-[13px] font-sans whitespace-pre-wrap leading-[1.5]',
-                        m.role === 'user'
-                          ? 'self-end bg-jade text-white'
-                          : 'self-start bg-paper border border-line text-ink',
-                      )}
-                    >
-                      {m.content || (sending && i === messages.length - 1 ? '…' : '')}
-                    </div>
-                  ))
+                  messages.map((m, i) => {
+                    const empty = !m.content && sending && i === messages.length - 1
+                    return (
+                      <div
+                        key={i}
+                        className={cn(
+                          'max-w-[88%] px-3 py-2 rounded-[10px] text-[13px] leading-[1.5]',
+                          m.role === 'user'
+                            ? 'self-end bg-jade text-white font-sans whitespace-pre-wrap'
+                            : 'self-start bg-paper border border-line text-ink',
+                        )}
+                      >
+                        {empty ? (
+                          <TypingDots />
+                        ) : m.role === 'assistant' ? (
+                          <div className="raabta-md">
+                            <ReactMarkdown>{m.content}</ReactMarkdown>
+                          </div>
+                        ) : (
+                          m.content
+                        )}
+                      </div>
+                    )
+                  })
                 )}
               </div>
 
@@ -339,6 +363,20 @@ export function RaabtaAI() {
 }
 
 /* ---- inline icons (palette-coloured, no extra deps) ---------------------- */
+
+function TypingDots() {
+  return (
+    <span className="flex items-center gap-1 py-0.5" aria-label="Raabta AI is typing">
+      {[0, 1, 2].map((i) => (
+        <span
+          key={i}
+          className="raabta-dot"
+          style={{ animation: `raabta-typing 1.2s ease-in-out ${i * 0.15}s infinite` }}
+        />
+      ))}
+    </span>
+  )
+}
 
 function BotFace({ className }: { className?: string }) {
   return (
