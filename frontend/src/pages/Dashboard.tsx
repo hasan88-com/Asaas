@@ -396,7 +396,7 @@ export default function Dashboard() {
                               <span className="font-sans text-[10px] text-ink-faint truncate max-w-[140px]">{h.name}</span>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{numFmt(qty, 4)}</td>
+                          <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{numFmt(qty, 2)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums">{numFmt(px ?? entry)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums font-medium">{value == null ? '—' : formatPkr(value)}</td>
                           <td className="px-3 py-2.5 text-right font-mono text-[12px] tabular-nums text-ink-soft">{invested == null ? '—' : formatPkr(invested)}</td>

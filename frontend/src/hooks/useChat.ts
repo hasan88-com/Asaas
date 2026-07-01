@@ -119,6 +119,16 @@ export function useChat() {
       setIsStreaming(false)
       setActiveTool(undefined)
       abortRef.current = null
+      // Safety net: whatever ends the stream (clean done, silent EOF, abort),
+      // finalise the message so it re-renders as markdown instead of staying in
+      // the plain-text streaming view until the next reload.
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId && m.role === 'assistant' && m.isStreaming
+            ? { ...m, isStreaming: false }
+            : m,
+        ),
+      )
     }
   }, [isStreaming])
 
