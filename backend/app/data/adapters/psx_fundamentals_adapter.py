@@ -77,7 +77,10 @@ async def fetch_psx_fundamentals(symbol: str) -> Dict[str, Any]:
         eps = pe_eps if pe_eps is not None else table_eps
 
     out: Dict[str, Any] = {}
-    if pe is not None and 0 < pe < 200:
+    # Accept any positive P/E — near-zero-earnings stocks (holding cos etc.) can
+    # legitimately show P/E in the hundreds/thousands (e.g. ENGROH ~2238, KEL ~836).
+    # dps shows "N/A" for loss-makers, which simply doesn't parse (correctly None).
+    if pe is not None and 0 < pe < 100000:
         out["trailingPE"] = pe
     if eps is not None:
         out["trailingEps"] = eps
