@@ -23,6 +23,10 @@ from app.agent.tools.run_dcf import run_dcf
 from app.agent.tools.run_monte_carlo import run_monte_carlo
 from app.agent.tools.run_multiples import run_multiples
 from app.agent.types import AgentState
+from app.services.valuation import (
+    run_fixed_income_valuation,
+    run_market_comparison,
+)
 
 logger = logging.getLogger("asaas.agent.roles.valuation")
 
@@ -46,6 +50,87 @@ _CONCEPT_WORDS = frozenset({
     "IPO", "ETF", "NAV", "YTD", "TTM", "GDP", "CPI", "SBP", "PSX", "KSE", "KMI",
     "MPT", "CAPM", "ERP", "FCF", "YTM", "DV01", "RSI", "MACD", "MFI", "AI",
 })
+
+
+# Non-equity instruments the app supports, keyed by natural-language name → the
+# canonical symbol the valuation service expects. These are checked BEFORE the
+# equity ticker regex so "gold"/"bitcoin"/"t-bill" route to the right method
+# instead of being mistaken for (or missed as) a PSX ticker.
+_COMMODITY_WORDS = {
+    "gold": "GC=F", "silver": "SI=F",
+}
+_CRYPTO_WORDS = {
+    "bitcoin": "BTC", "btc": "BTC",
+    "ethereum": "ETH", "ether": "ETH", "eth": "ETH",
+    "solana": "SOL", "sol": "SOL",
+    "binance coin": "BNB", "bnb": "BNB",
+    "ripple": "XRP", "xrp": "XRP",
+    "cardano": "ADA", "ada": "ADA",
+    "dogecoin": "DOGE", "doge": "DOGE",
+}
+# Commodity spot symbols (GC=F/SI=F) and crypto tickers get friendly names for
+# the answer header, since extract_company_info is equity-only.
+_INSTRUMENT_NAMES = {
+    "GC=F": "Gold (Spot)", "SI=F": "Silver (Spot)",
+    "BTC": "Bitcoin", "ETH": "Ethereum", "SOL": "Solana", "BNB": "Binance Coin",
+    "XRP": "Ripple (XRP)", "ADA": "Cardano", "DOGE": "Dogecoin",
+}
+# Debt tenor keys the fixed-income valuation understands, resolved from a maturity
+# phrase; falls back to a sensible default per instrument family.
+_DEBT_TENOR_PATTERNS = [
+    (r"\b1[\s-]?month\b", "MTB-1M"),
+    (r"\b3[\s-]?month\b", "MTB-3M"),
+    (r"\b6[\s-]?month\b", "MTB-6M"),
+    (r"\b(?:12[\s-]?month|1[\s-]?year)\b", "MTB-12M"),
+    (r"\b2[\s-]?year\b", "PIB-2Y"),
+    (r"\b3[\s-]?year\b", "PIB-3Y"),
+    (r"\b5[\s-]?year\b", "PIB-5Y"),
+    (r"\b7[\s-]?year\b", "PIB-7Y"),
+    (r"\b10[\s-]?year\b", "PIB-10Y"),
+    (r"\b20[\s-]?year\b", "PIB-20Y"),
+]
+
+
+def _detect_instrument(message: str) -> tuple[Optional[str], str]:
+    """Identify the subject instrument and its asset class from free text.
+
+    Returns (symbol, asset_class) where asset_class is one of
+    "crypto" | "commodity" | "debt" | "equity". Non-equity classes are matched
+    first (by keyword) so plain-English "gold", "bitcoin", "t-bills" route to
+    their dedicated valuation methods; anything else falls back to the equity
+    ticker parser. Returns (None, "equity") when nothing is recognised.
+    """
+    low = message.lower()
+
+    # Crypto (word-boundary match so "sol"/"ada"/"eth" don't fire mid-word).
+    for word, sym in _CRYPTO_WORDS.items():
+        if re.search(rf"\b{re.escape(word)}\b", low):
+            return sym, "crypto"
+
+    # Commodity.
+    for word, sym in _COMMODITY_WORDS.items():
+        if re.search(rf"\b{re.escape(word)}\b", low):
+            return sym, "commodity"
+
+    # Debt: explicit tenor key (MTB-3M / PIB-5Y / GIS-3Y) or a debt keyword.
+    explicit = re.search(r"\b((?:MTB|PIB|GIS)-\d+[MY])\b", message.upper())
+    if explicit:
+        return explicit.group(1), "debt"
+    if re.search(r"\bt[\s-]?bill|treasury bill|\bmtb\b", low):
+        for pat, key in _DEBT_TENOR_PATTERNS:
+            if re.search(pat, low) and key.startswith("MTB"):
+                return key, "debt"
+        return "MTB-3M", "debt"
+    if re.search(r"\bpib\b|investment bond|government bond|govt bond", low):
+        for pat, key in _DEBT_TENOR_PATTERNS:
+            if re.search(pat, low) and key.startswith("PIB"):
+                return key, "debt"
+        return "PIB-10Y", "debt"
+    if re.search(r"\bsukuk\b|\bgis\b|ijara", low):
+        return "GIS-3Y", "debt"
+
+    # Fall back to the equity ticker parser.
+    return _extract_symbol(message), "equity"
 
 
 async def _portfolio_context(db: AsyncSession, user_id, symbol: str) -> dict:
@@ -114,40 +199,65 @@ async def run_valuation(
     then ask the LLM to interpret results for the investor.
     All 4 tools run concurrently. One LLM call — no self-chaining (AGENT_RULES.md §3).
     """
-    symbol = _extract_symbol(state["user_message"])
+    symbol, asset_class = _detect_instrument(state["user_message"])
     if not symbol:
         state["response"] = (
-            "Please name the company or ticker you'd like valued "
-            "(e.g. 'value HBL' or 'DCF on OGDC' or 'tell me about PSO')."
+            "Please name the instrument you'd like valued — a stock "
+            "(e.g. 'tell me about PSO'), a commodity ('gold', 'silver'), "
+            "a crypto ('bitcoin', 'ETH'), or a govt security ('3-month T-bill')."
         )
         return state
-
-    # Normalise to the PSX .KA form so ALL tools (incl. company_info) hit the
-    # dps/PSX fundamentals source, not a foreign yfinance ticker.
-    from app.services.valuation import _yf_equity_symbol
-    symbol = _yf_equity_symbol(symbol)
-
-    logger.info("Running valuation for symbol=%s", symbol)
-
-    info, dcf, mc, mult = await asyncio.gather(
-        extract_company_info(symbol),
-        run_dcf(symbol),
-        run_monte_carlo(symbol),
-        run_multiples(symbol),
-        return_exceptions=True,
-    )
 
     def _safe(result, name: str) -> object:
         return result if not isinstance(result, Exception) else f"{name}: unavailable ({result})"
 
-    payload = {
-        "symbol": symbol,
-        "company_info": _safe(info, "company_info"),
-        "dcf": _safe(dcf, "dcf"),
-        "monte_carlo": _safe(mc, "monte_carlo"),
-        "multiples": _safe(mult, "multiples"),
-        "portfolio_context": await _portfolio_context(db, state.get("user_id"), symbol),
-    }
+    logger.info("Running valuation for symbol=%s asset_class=%s", symbol, asset_class)
+
+    # --- Crypto & commodity: market-price comparison (no P/E / DCF apply) ------
+    if asset_class in ("crypto", "commodity"):
+        market = await run_market_comparison(symbol)
+        payload = {
+            "symbol": symbol,
+            "asset_class": asset_class,
+            "name": _INSTRUMENT_NAMES.get(symbol, symbol),
+            "market_comparison": _safe(market, "market_comparison"),
+            "portfolio_context": await _portfolio_context(db, state.get("user_id"), symbol),
+        }
+
+    # --- Debt: yield-to-maturity + interest-rate risk (duration) ---------------
+    elif asset_class == "debt":
+        fi = await run_fixed_income_valuation(symbol)
+        payload = {
+            "symbol": symbol,
+            "asset_class": "debt",
+            "name": symbol,
+            "fixed_income": _safe(fi, "fixed_income"),
+            "portfolio_context": await _portfolio_context(db, state.get("user_id"), symbol),
+        }
+
+    # --- Equity: DCF + Monte Carlo + multiples (relative valuation) ------------
+    else:
+        # Normalise to the PSX .KA form so ALL tools (incl. company_info) hit the
+        # dps/PSX fundamentals source, not a foreign yfinance ticker.
+        from app.services.valuation import _yf_equity_symbol
+        symbol = _yf_equity_symbol(symbol)
+
+        info, dcf, mc, mult = await asyncio.gather(
+            extract_company_info(symbol),
+            run_dcf(symbol),
+            run_monte_carlo(symbol),
+            run_multiples(symbol),
+            return_exceptions=True,
+        )
+        payload = {
+            "symbol": symbol,
+            "asset_class": "equity",
+            "company_info": _safe(info, "company_info"),
+            "dcf": _safe(dcf, "dcf"),
+            "monte_carlo": _safe(mc, "monte_carlo"),
+            "multiples": _safe(mult, "multiples"),
+            "portfolio_context": await _portfolio_context(db, state.get("user_id"), symbol),
+        }
 
     user_content = "\n\n".join(p for p in [
         f"Valuation data:\n{json.dumps(payload, default=str)}",
