@@ -71,32 +71,29 @@ def _mistral_client() -> AsyncOpenAI:
 
 # ── Task → provider chain ─────────────────────────────────────────────────────
 
-# Every chain spans multiple PROVIDERS with a free one first (Groq), so a single
-# provider's quota/429 (e.g. Gemini) never takes a task down. Mistral (free tier,
-# OpenAI-compatible) is the final safety net. No chain is single-provider.
+# Mistral (free tier, OpenAI-compatible) is the PRIMARY provider — the chosen
+# Gemini alternative — with Gemini as fallback and Cerebras as an optional extra.
+# Every chain spans multiple providers, so one provider's quota/429 never takes a
+# task down. (Providers whose API key isn't set simply fail-fast and are skipped.)
 TASK_CHAINS: dict[str, list[dict]] = {
     "light": [
-        {"provider": "groq",    "model": "llama-3.1-8b-instant"},
-        {"provider": "gemini",  "model": "gemini-2.5-flash"},
         {"provider": "mistral", "model": "mistral-small-latest"},
+        {"provider": "gemini",  "model": "gemini-2.5-flash"},
     ],
     "chat": [
-        {"provider": "groq",     "model": "llama-3.3-70b-versatile"},
-        {"provider": "cerebras", "model": "llama3.3-70b"},
-        {"provider": "gemini",   "model": "gemini-2.5-flash"},
         {"provider": "mistral",  "model": "mistral-small-latest"},
+        {"provider": "gemini",   "model": "gemini-2.5-flash"},
+        {"provider": "cerebras", "model": "llama3.3-70b"},
     ],
     "reasoning": [
-        {"provider": "groq",     "model": "llama-3.3-70b-versatile"},
-        {"provider": "cerebras", "model": "llama3.3-70b"},
-        {"provider": "gemini",   "model": "gemini-2.5-flash"},
         {"provider": "mistral",  "model": "mistral-small-latest"},
+        {"provider": "gemini",   "model": "gemini-2.5-flash"},
+        {"provider": "cerebras", "model": "llama3.3-70b"},
     ],
     "hard": [
-        {"provider": "groq",     "model": "llama-3.3-70b-versatile"},
-        {"provider": "cerebras", "model": "llama3.3-70b"},
-        {"provider": "gemini",   "model": "gemini-2.5-pro"},
         {"provider": "mistral",  "model": "mistral-small-latest"},
+        {"provider": "gemini",   "model": "gemini-2.5-pro"},
+        {"provider": "cerebras", "model": "llama3.3-70b"},
     ],
 }
 
