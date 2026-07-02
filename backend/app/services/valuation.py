@@ -20,12 +20,24 @@ import numpy as np
 
 logger = logging.getLogger("asaas.services.valuation")
 
-_EQUITY_RISK_PREMIUM = Decimal("0.1635")  # Pakistan total ERP — Damodaran (Caa2):
-# 12.02% country risk premium + 4.33% mature-market premium. Among the world's
-# highest, so WACC lands in the high-teens/low-20s% and DCF outputs are a
-# conservative floor, very sensitive to inputs (field guide §1.A).
+
+def _cfg(name: str, default: str) -> Decimal:
+    """Read a valuation assumption from settings as Decimal (env-overridable)."""
+    try:
+        from app.core.config import get_settings
+        return Decimal(str(getattr(get_settings(), name)))
+    except Exception:
+        return Decimal(default)
+
+
+# Valuation assumptions — sourced from config so they can be tuned via env
+# without a code change (see app/core/config.py).
+_EQUITY_RISK_PREMIUM = _cfg("equity_risk_premium", "0.08")  # equity risk premium
+_WACC_CAP = _cfg("wacc_cap", "0.22")                        # max WACC (sanity cap)
+_PK_GDP_GROWTH = _cfg("pk_gdp_growth", "0.037")             # perpetuity/terminal g
+_TAX_RATE = _cfg("corporate_tax_rate", "0.30")             # for after-tax cost of debt
 _DEFAULT_BETA = Decimal("1.0")
-_TERMINAL_GROWTH = Decimal("0.03")  # 3% terminal growth default
+_TERMINAL_GROWTH = _PK_GDP_GROWTH  # terminal growth defaults to GDP growth
 _SHARES_FALLBACK = Decimal("1000000000")  # 1B shares if not available
 
 
@@ -467,6 +479,58 @@ async def extract_company_info(symbol: str, db=None) -> Dict[str, Any]:
     return result
 
 
+def _compute_wacc(
+    info: Dict[str, Any],
+    balance_sheet: Any,
+    income: Any,
+    risk_free: Decimal,
+    beta: Decimal,
+) -> Dict[str, Decimal]:
+    """Weighted-average cost of capital with capital-structure weighting.
+
+    Re = risk_free + beta*ERP (CAPM). Rd = interest_expense/total_debt, clamped
+    to a sane band, else a small spread over risk_free. Weights from market cap
+    (E) and total debt (D); all-equity when debt is absent/unknown. The result
+    is capped at ``_WACC_CAP`` so one noisy input can't yield an absurd discount
+    rate. Returns the components for transparency.
+    """
+    re = risk_free + beta * _EQUITY_RISK_PREMIUM
+
+    total_debt = _find_row(balance_sheet, "total debt", "long term debt") or Decimal("0")
+    if total_debt < 0:
+        total_debt = Decimal("0")
+
+    # Cost of debt: interest expense / total debt, clamped to [rf, rf+6%].
+    rd = risk_free + Decimal("0.02")
+    interest_expense = _find_row(income, "interest expense")
+    if interest_expense is not None and total_debt > 0:
+        rd_calc = abs(interest_expense) / total_debt
+        rd = max(risk_free, min(risk_free + Decimal("0.06"), rd_calc))
+
+    equity_val = _to_decimal(info.get("marketCap"))
+    if equity_val is None or equity_val <= 0:
+        price = _to_decimal(info.get("currentPrice") or info.get("regularMarketPrice"))
+        shares = _to_decimal(info.get("sharesOutstanding"))
+        equity_val = (price * shares) if (price and shares) else None
+
+    if equity_val is None or equity_val <= 0 or total_debt <= 0:
+        wacc_uncapped = re  # all-equity or unknown capital structure
+        we, wd = Decimal("1"), Decimal("0")
+    else:
+        v = equity_val + total_debt
+        we, wd = equity_val / v, total_debt / v
+        wacc_uncapped = we * re + wd * rd * (Decimal("1") - _TAX_RATE)
+
+    return {
+        "wacc": min(wacc_uncapped, _WACC_CAP),
+        "wacc_uncapped": wacc_uncapped,
+        "re": re,
+        "rd": rd,
+        "weight_equity": we,
+        "weight_debt": wd,
+    }
+
+
 async def run_dcf(
     symbol: str,
     assumptions: Optional[Dict[str, Any]] = None,
@@ -527,24 +591,36 @@ async def run_dcf(
     # Shares outstanding
     shares = _to_decimal(info.get("sharesOutstanding")) or _SHARES_FALLBACK
 
-    # WACC: risk-free = SBP rate; beta from yfinance or default 1.0
+    # WACC: risk-free = SBP rate; beta from yfinance or default 1.0. Proper
+    # capital-structure WACC (capped) — not just cost of equity.
     risk_free, rf_placeholder = await _get_sbp_rate()
     beta = _to_decimal(info.get("beta")) or _DEFAULT_BETA
     equity_premium = _EQUITY_RISK_PREMIUM
-    wacc = risk_free + beta * equity_premium
+    wacc_parts = _compute_wacc(info, balance_sheet, income, risk_free, beta)
+    wacc = wacc_parts["wacc"]
 
-    # Override from assumptions if provided
+    # Override from assumptions if provided. Projection growth defaults to the
+    # company's earnings growth, else GDP growth (not a hardcoded 5%).
     growth_rate = _to_decimal(assumptions.get("growth_rate")) or (
-        _to_decimal(info.get("earningsGrowth")) or Decimal("0.05")
+        _to_decimal(info.get("earningsGrowth")) or _PK_GDP_GROWTH
     )
     terminal_growth = _to_decimal(assumptions.get("terminal_growth")) or _TERMINAL_GROWTH
     wacc = _to_decimal(assumptions.get("wacc")) or wacc
 
     # Clamp growth to sane range [-0.20, 0.30]
     growth_rate = max(Decimal("-0.20"), min(Decimal("0.30"), growth_rate))
-    # Ensure WACC > terminal_growth to avoid division by zero
+    # Model is invalid when the discount rate doesn't exceed perpetuity growth
+    # (Gordon terminal value diverges). Don't fudge the rate — say so.
     if wacc <= terminal_growth:
-        wacc = terminal_growth + Decimal("0.02")
+        return {
+            "insufficient_data": True,
+            "reason": (
+                "DCF model invalid for this ticker: the discount rate (WACC "
+                f"{wacc*100:.1f}%) does not exceed the terminal growth rate "
+                f"({terminal_growth*100:.1f}%), which would imply an infinite value. "
+                "Relative valuation is used instead."
+            ),
+        }
 
     # Project 5-year FCF
     pv_total = Decimal("0")
@@ -585,6 +661,10 @@ async def run_dcf(
         "enterprise_value": str(enterprise_value.quantize(Decimal("1"))),
         "equity_value": str(equity_value.quantize(Decimal("1"))),
         "wacc": str(wacc.quantize(Decimal("0.0001"))),
+        "wacc_uncapped": str(wacc_parts["wacc_uncapped"].quantize(Decimal("0.0001"))),
+        "cost_of_equity": str(wacc_parts["re"].quantize(Decimal("0.0001"))),
+        "cost_of_debt": str(wacc_parts["rd"].quantize(Decimal("0.0001"))),
+        "risk_flag": "High Risk" if wacc_parts["wacc_uncapped"] > _WACC_CAP else None,
         "risk_free_rate": str(risk_free.quantize(Decimal("0.0001"))),
         "risk_free_is_placeholder": rf_placeholder,
         "growth_rate": str(growth_rate.quantize(Decimal("0.0001"))),
@@ -809,23 +889,57 @@ async def _relative_valuation(
         industry_pe = industry_pe_for_sector(sector)
         source = "sector_benchmark"
 
-    fair_value = None
-    verdict = None
     equity = asset_class in (None, "psx_stock", "global_stock", "equity")
-    if equity and eps is not None and eps > 0 and industry_pe is not None:
-        fair_value = industry_pe * eps
-        if price is not None and fair_value > 0:
-            ratio = price / fair_value
-            gap = (ratio - 1) * 100
-            if ratio < Decimal("0.9"):
-                verdict = f"appears undervalued by ~{abs(gap):.0f}% vs the sector multiple"
-            elif ratio > Decimal("1.1"):
-                verdict = f"appears overvalued by ~{gap:.0f}% vs the sector multiple"
-            else:
-                verdict = "appears fairly valued vs the sector multiple"
+
+    # WACC (capital-structure, capped) + perpetuity growth for the intrinsic model.
+    g = _PK_GDP_GROWTH
+    beta = _to_decimal(info.get("beta")) or _DEFAULT_BETA
+    risk_free, _rf_ph = await _get_sbp_rate()
+    wacc_parts = _compute_wacc(info, bundle.get("balance"), bundle.get("income"), risk_free, beta)
+    wacc = wacc_parts["wacc"]
+
+    # Sector-multiple fair value (peer cross-check, secondary).
+    sector_fair_value = (industry_pe * eps) if (equity and eps and eps > 0 and industry_pe) else None
+
+    # Intrinsic (single-stage Gordon on earnings) fair value + justified P/E —
+    # the new headline. Valid only when WACC > g. Sensitive to (WACC - g); with
+    # Pakistan's high rates this compresses justified multiples (economically
+    # expected). Presented as an estimate, cross-checked by the sector multiple.
+    intrinsic_fair_value = None
+    justified_pe = None
+    if equity and eps is not None and eps > 0 and wacc > g:
+        intrinsic_fair_value = eps * (Decimal("1") + g) / (wacc - g)
+        justified_pe = (Decimal("1") - g / wacc) / (wacc - g)
+
+    # Headline fair value: intrinsic when available, else the sector multiple.
+    fair_value = intrinsic_fair_value if intrinsic_fair_value is not None else sector_fair_value
+    basis = "intrinsic value" if intrinsic_fair_value is not None else "the sector multiple"
+
+    verdict = None
+    flags: list[str] = []
+    if fair_value is not None and price is not None and fair_value > 0:
+        ratio = price / fair_value
+        gap = (ratio - 1) * 100
+        if ratio < Decimal("0.9"):
+            verdict = f"appears undervalued by ~{abs(gap):.0f}% vs {basis}"
+        elif ratio > Decimal("1.1"):
+            verdict = f"appears overvalued by ~{gap:.0f}% vs {basis}"
+        else:
+            verdict = f"appears fairly valued vs {basis}"
+        if ratio > Decimal("1.3"):
+            flags.append("Significantly Overvalued")
+
+    subj_pe, subj_fpe = subject.get("pe"), subject.get("forward_pe")
+    if (subj_pe and subj_pe > 20) or (subj_fpe and subj_fpe > 20):
+        flags.append("Growth Stock")
+    if wacc_parts["wacc_uncapped"] > _WACC_CAP:
+        flags.append("High Risk")
 
     def _s(v):
         return str(v.quantize(Decimal("0.01"))) if isinstance(v, Decimal) else v
+
+    def _s4(v):
+        return str(v.quantize(Decimal("0.0001"))) if isinstance(v, Decimal) else v
 
     return {
         "asset_class": asset_class,
@@ -834,8 +948,15 @@ async def _relative_valuation(
         "eps": _s(eps),
         "industry_pe": _s(industry_pe),
         "industry_pe_source": source,
+        "sector_fair_value": _s(sector_fair_value),
+        "intrinsic_fair_value": _s(intrinsic_fair_value),
+        "justified_pe": _s(justified_pe),
+        "wacc": _s4(wacc),
+        "cost_of_equity": _s4(wacc_parts["re"]),
+        "terminal_growth": _s4(g),
         "fair_value": _s(fair_value),
         "verdict": verdict,
+        "flags": flags,
     }
 
 
@@ -890,10 +1011,18 @@ async def run_multiples(
         "peer_pe_median": _s(_median("pe")),
         "peer_ev_ebitda_median": _s(_median("ev_ebitda")),
         "peer_pb_median": _s(_median("pb")),
-        # Industry-P/E × EPS relative valuation + instrument metadata.
+        # Intrinsic (Gordon) fair value + justified P/E — headline valuation.
         "eps": rel["eps"],
+        "intrinsic_fair_value": rel["intrinsic_fair_value"],
+        "justified_pe": rel["justified_pe"],
+        "wacc": rel["wacc"],
+        "cost_of_equity": rel["cost_of_equity"],
+        "terminal_growth": rel["terminal_growth"],
+        "flags": rel["flags"],
+        # Industry-P/E × EPS relative valuation (sector cross-check) + metadata.
         "industry_pe": rel["industry_pe"],
         "industry_pe_source": rel["industry_pe_source"],
+        "sector_fair_value": rel["sector_fair_value"],
         "fair_value": rel["fair_value"],
         "verdict": rel["verdict"],
         "asset_class": rel["asset_class"],

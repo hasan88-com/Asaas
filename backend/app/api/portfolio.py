@@ -780,6 +780,65 @@ async def get_holdings(
     return await _holdings_with_prices(portfolio.holdings, db)
 
 
+def round_quantity(qty: Decimal, asset_class: Optional[str]) -> Decimal:
+    """Order-entry rounding by asset class: stocks trade in whole shares, funds
+    to 2 dp, bonds/T-bills to 4 dp; crypto/commodity stay fractional. Applied to
+    NEW orders only — existing fractional holdings are left untouched."""
+    ac = (asset_class or "").lower()
+    if ac in ("equity", "psx_stock", "global_stock", "stock"):
+        return Decimal(int(qty))  # floor to whole shares
+    if ac in ("fund", "etf", "mutual_fund"):
+        return qty.quantize(Decimal("0.01"))
+    if ac in ("bond", "tbill", "debt", "sukuk"):
+        return qty.quantize(Decimal("0.0001"))
+    return qty  # crypto / commodity — fractional allowed
+
+
+async def _recompute_weights(portfolio: Portfolio, db: AsyncSession) -> Optional[str]:
+    """Recompute each holding's actual_weight from current market value so the
+    weights reflect reality after a buy/sell, and return a concentration warning
+    when any single sector exceeds 25% of portfolio value."""
+    from app.data.cache import get_price
+    from app.models.instrument import Instrument
+
+    rows = (await db.execute(
+        select(Holding, Instrument).join(Instrument, Instrument.id == Holding.instrument_id)
+        .where(Holding.portfolio_id == portfolio.id)
+    )).all()
+    if not rows:
+        return None
+
+    valued: list[tuple[Holding, str, Decimal]] = []
+    total = Decimal("0")
+    for h, inst in rows:
+        try:
+            price = await get_price(inst.symbol, db)
+        except Exception:
+            price = None
+        val = (Decimal(str(price)) * (h.quantity or Decimal("0"))) if price else Decimal("0")
+        valued.append((h, inst.sector or "Unknown", val))
+        total += val
+
+    if total <= 0:
+        return None
+
+    sector_totals: dict[str, Decimal] = {}
+    for h, sector, val in valued:
+        h.actual_weight = val / total
+        sector_totals[sector] = sector_totals.get(sector, Decimal("0")) + val
+    await db.commit()
+
+    worst = max(sector_totals.items(), key=lambda kv: kv[1], default=None)
+    if worst:
+        pct = worst[1] / total * 100
+        if pct > 25:
+            return (
+                f"{worst[0]} is {pct:.0f}% of your portfolio (>25% concentration). "
+                "Consider diversifying."
+            )
+    return None
+
+
 @router.post("/holdings/add", response_model=PortfolioResponse, status_code=status.HTTP_201_CREATED)
 async def add_holding(
     payload: AddHoldingRequest,
@@ -799,10 +858,21 @@ async def add_holding(
             detail=f"Instrument '{payload.symbol}' not found.",
         )
 
+    # Order-entry rounding by asset class (stocks → whole shares, etc.).
+    qty = round_quantity(payload.quantity, inst.asset_class)
+    if qty <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Order for {payload.symbol} rounds to 0 units — stocks trade in "
+                "whole shares. Increase the quantity to at least 1."
+            ),
+        )
+
     holding = Holding(
         portfolio_id=portfolio.id,
         instrument_id=inst.id,
-        quantity=payload.quantity,
+        quantity=qty,
         entry_price=payload.entry_price,
         entry_date=payload.entry_date or datetime.now(timezone.utc).date(),
         actual_weight=Decimal("0"),
@@ -813,7 +883,10 @@ async def add_holding(
     from app.workers.warm_prices import run_warm_prices
     background_tasks.add_task(run_warm_prices)  # warm the just-added instrument
     await invalidate_cache(portfolio_key(current_user.id))
-    return await _load_active_portfolio(current_user, db)
+    warning = await _recompute_weights(portfolio, db)
+    result = await _load_active_portfolio(current_user, db)
+    result.concentration_warning = warning
+    return result
 
 
 @router.post("/holdings/sell", response_model=PortfolioResponse)
@@ -854,7 +927,10 @@ async def sell_holding(
     await db.commit()
     background_tasks.add_task(_write_initial_snapshot, portfolio.id)
     await invalidate_cache(portfolio_key(current_user.id))
-    return await _load_active_portfolio(current_user, db)
+    warning = await _recompute_weights(portfolio, db)
+    result = await _load_active_portfolio(current_user, db)
+    result.concentration_warning = warning
+    return result
 
 
 @router.put("/holdings/{holding_id}", response_model=PortfolioResponse)

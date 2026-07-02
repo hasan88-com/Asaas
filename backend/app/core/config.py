@@ -69,6 +69,16 @@ class Settings(BaseSettings):
     # --- Guest Mode ---
     guest_free_runs: int = 3
 
+    # --- Valuation assumptions (env-overridable so they can be tuned without a
+    # code change). ERP defaults to 8% for a realistic WACC (the higher
+    # Damodaran Pakistan total ERP of ~16% pushed WACC into the high-20s%);
+    # WACC is capped so a single noisy input can't produce absurd fair values.
+    # Terminal/perpetuity growth = Pakistan GDP growth. ---
+    equity_risk_premium: float = 0.08
+    wacc_cap: float = 0.22
+    pk_gdp_growth: float = 0.037
+    corporate_tax_rate: float = 0.30
+
 
 @lru_cache
 def get_settings() -> Settings:

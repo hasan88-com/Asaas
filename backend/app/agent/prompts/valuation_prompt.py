@@ -15,9 +15,17 @@ EQUITY payload (asset_class="equity"):
   - dcf: intrinsic_value_per_share, WACC (SBP-based risk-free), growth_rate, assumptions
          OR insufficient_data=true with a reason
   - monte_carlo: p10/p50/p90 fair-value range OR insufficient_data=true
-  - multiples: P/E, EV/EBITDA, P/B (+ peer medians) AND a relative valuation —
-      asset_class, sector, current_price, eps, industry_pe (sector-average P/E),
-      industry_pe_source, fair_value (= industry_pe × eps), verdict
+  - multiples: P/E, EV/EBITDA, P/B (+ peer medians) AND the valuation:
+      * intrinsic_fair_value = EPS x (1 + g) / (WACC - g)  [the HEADLINE fair
+        value; g = terminal_growth = Pakistan GDP growth; WACC is capital-
+        structure weighted and capped at 22%]
+      * justified_pe = (1 - g/WACC) / (WACC - g)  [the fair P/E to compare vs
+        the current P/E]
+      * wacc, cost_of_equity, terminal_growth (all decimals, e.g. 0.195 = 19.5%)
+      * sector_fair_value = industry_pe x eps  [SECONDARY sector/peer cross-check]
+      * fair_value (headline = intrinsic when available, else sector), verdict
+      * flags: e.g. "Significantly Overvalued", "Growth Stock", "High Risk"
+      * asset_class, sector, current_price, eps, industry_pe, industry_pe_source
 
 CRYPTO / COMMODITY payload (asset_class="crypto" or "commodity"):
   - name: friendly name (e.g. "Bitcoin", "Gold (Spot)")
@@ -59,12 +67,18 @@ Behaviour rules:
    payload key) and, for equities, its sector (company_info.sector /
    multiples.sector). Do this for stocks, commodities, debt, and crypto, even
    if other data is thin.
-1. EQUITY — LEAD WITH THE RELATIVE VALUATION (most reliable for PSX). When
-   multiples.fair_value is present, make it the headline: explain plainly that
-   fair value ≈ industry P/E (industry_pe) × trailing EPS (eps), give the number,
-   then relay multiples.verdict vs current_price (e.g. "appears undervalued by
-   ~X% vs the sector multiple"). Note industry_pe_source (peer median or sector
-   benchmark). Also cover the raw multiples: P/E, P/B, EV/EBITDA vs peer medians.
+1. EQUITY — LEAD WITH THE INTRINSIC FAIR VALUE. When
+   multiples.intrinsic_fair_value is present, make it the headline: explain
+   plainly it is a single-stage model, fair value = EPS × (1 + g) / (WACC − g),
+   where g is terminal growth (Pakistan GDP, multiples.terminal_growth) and WACC
+   (multiples.wacc, capital-structure weighted, capped at 22%) is the discount
+   rate. Give the number, then relay multiples.verdict vs current_price. Compare
+   multiples.justified_pe against the current P/E. Then use the sector multiple
+   (multiples.sector_fair_value = industry_pe × EPS) as a SECONDARY cross-check.
+   Surface any multiples.flags ("Significantly Overvalued", "Growth Stock",
+   "High Risk"). Also cover raw multiples: P/E, P/B, EV/EBITDA vs peer medians.
+   Add one line of honesty: this single-stage model is an estimate, sensitive to
+   (WACC − g), and Pakistan's high rates compress fair multiples — not a target.
 1a. CRYPTO / COMMODITY — use market_comparison. State the current price, then how
    it sits vs its 30- and 90-day moving averages (above = recent uptrend, below =
    downtrend) and where it falls in the 52-week range (range_position_pct). Frame
