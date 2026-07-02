@@ -355,10 +355,18 @@ export interface MultiplesResult {
   pb_ratio?: string
   peer_pe_median?: string
   peer_ev_ebitda_median?: string
-  // Industry-P/E × EPS relative valuation + instrument metadata
+  // Intrinsic (Gordon) fair value + justified P/E — headline valuation
   eps?: string
+  intrinsic_fair_value?: string | null
+  justified_pe?: string | null
+  wacc?: string
+  cost_of_equity?: string
+  terminal_growth?: string
+  flags?: string[]
+  // Sector-multiple cross-check + instrument metadata
   industry_pe?: string
   industry_pe_source?: string
+  sector_fair_value?: string | null
   fair_value?: string
   verdict?: string | null
   asset_class?: string | null
@@ -512,4 +520,33 @@ export interface ConversationMessage {
   role: 'user' | 'assistant'
   content: string
   created_at: string
+}
+
+/* ------------------------------------------------------------------ */
+/* Wallet — virtual PKR cash                                           */
+/* ------------------------------------------------------------------ */
+export interface WalletResponse {
+  balance: string   // Decimal as string
+  currency: string
+  created_at: string
+}
+
+export type CashTransactionType = 'deposit' | 'withdrawal' | 'buy' | 'sell'
+
+export interface CashTransaction {
+  id: string
+  type: CashTransactionType
+  amount: string          // Decimal as string, always positive; sign implied by type
+  balance_after: string
+  symbol?: string | null
+  quantity?: string | null
+  price?: string | null
+  status: string
+  note?: string | null
+  created_at: string
+}
+
+export interface TransactionListResponse {
+  items: CashTransaction[]
+  total: number
 }

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Info } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import {
   getPortfolio,
@@ -12,6 +13,7 @@ import { PerformanceLine } from '@/components/charts/PerformanceLine'
 import { AllocationDonut } from '@/components/charts/AllocationDonut'
 import { FlagCard } from '@/components/layout/FlagCard'
 import { MyActivity } from '@/components/layout/MyActivity'
+import { WalletCard } from '@/components/layout/WalletCard'
 import { MarketSentimentGauge } from '@/components/layout/MarketSentimentGauge'
 import { RiskPanel } from '@/components/layout/RiskPanel'
 import { cn } from '@/lib/utils'
@@ -58,13 +60,21 @@ function Skel({ className }: { className?: string }) {
 }
 
 function StatCell({
-  label, value, positive, sub,
+  label, value, positive, sub, info,
 }: {
-  label: string; value: string; positive?: boolean; sub?: string
+  label: string; value: string; positive?: boolean; sub?: string; info?: string
 }) {
   return (
     <div className="bg-card border border-line rounded-[10px] p-4 flex flex-col gap-1.5">
-      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">{label}</span>
+      <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint flex items-center gap-1">
+        {label}
+        {info && (
+          <span className="tooltip-trigger inline-flex" tabIndex={0} aria-label={info}>
+            <Info size={11} className="text-ink-faint/70 hover:text-ink-soft cursor-help" />
+            <span className="tooltip-content normal-case tracking-normal font-sans">{info}</span>
+          </span>
+        )}
+      </span>
       <span className={cn(
         'font-mono text-[18px] font-medium tabular-nums',
         positive === true ? 'text-gain' : positive === false ? 'text-loss' : 'text-ink',
@@ -101,6 +111,7 @@ export default function Dashboard() {
   // "Build your first portfolio" empty state.
   const [loadError, setLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [walletRefreshKey, setWalletRefreshKey] = useState(0)
 
   useEffect(() => {
     if (authLoading) return   // wait for Supabase session to settle
@@ -171,6 +182,7 @@ export default function Dashboard() {
   // Re-fetch portfolio + performance after a portfolio-activity change.
   // Use live=true so the user sees accurate post-change figures (incl. per-holding).
   async function refresh() {
+    setWalletRefreshKey((k) => k + 1) // buys/sells move cash
     const [p, pf] = await Promise.allSettled([getPortfolio(), getPerformance({ live: true })])
     if (p.status === 'fulfilled') setPortfolio(p.value)
     if (pf.status === 'fulfilled') setPerf(pf.value)
@@ -348,11 +360,13 @@ export default function Dashboard() {
               value={!portfolioReady ? '—' : portfolio ? `${(parseFloat(portfolio.expected_return) * 100).toFixed(1)}%` : '—'}
               positive={portfolioReady && portfolio ? parseFloat(portfolio.expected_return) > 0 : undefined}
               sub={portfolio?.risk_free_rate ? `SBP ${(parseFloat(portfolio.risk_free_rate) * 100).toFixed(2)}%` : undefined}
+              info={'Expected return per annum (per year). The MPT optimiser estimates this from each holding’s historical returns and its weight in your portfolio. It is a forward-looking estimate, not a guarantee, and is shown against the SBP risk-free rate.'}
             />
             <StatCell
               label="Sharpe"
               value={!portfolioReady ? '—' : portfolio ? parseFloat(portfolio.sharpe).toFixed(2) : '—'}
               positive={portfolioReady && portfolio ? parseFloat(portfolio.sharpe) > 1 : undefined}
+              info={'Sharpe ratio: return earned above the SBP risk-free rate per unit of risk (volatility). Higher is better — above 1 is generally considered good.'}
             />
           </div>
 
@@ -440,6 +454,9 @@ export default function Dashboard() {
 
         {/* RIGHT sidebar — always rendered */}
         <aside className="flex flex-col gap-5">
+
+          {/* Cash wallet — virtual PKR balance */}
+          <WalletCard refreshKey={walletRefreshKey} />
 
           {/* Risk Score */}
           <div className="bg-card border border-line rounded-[10px] p-5">

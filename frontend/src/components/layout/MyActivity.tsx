@@ -77,8 +77,8 @@ export function MyActivity({
       await onChanged()
       close()
     } catch (e) {
-      const s = (e as { status?: number }).status
-      setError(s === 422 ? 'Insufficient holdings.' : (e instanceof Error ? e.message : 'Something went wrong.'))
+      // ApiError.message carries the backend `detail` (e.g. "Insufficient funds: …")
+      setError(e instanceof Error && e.message ? e.message : 'Something went wrong.')
       setSubmitting(false)
     }
   }
@@ -145,6 +145,13 @@ export function MyActivity({
             <div><label className={labelCls}>Date</label>
               <input className={inputCls} type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></div>
           </div>
+          {buyCat === 'stock' && buyQty && Number(buyQty) % 1 !== 0 && (
+            <p className="font-mono text-[11px] text-ink-faint">
+              Stocks trade in whole shares — this will be recorded as{' '}
+              {Math.floor(Number(buyQty))} share{Math.floor(Number(buyQty)) === 1 ? '' : 's'}
+              {Math.floor(Number(buyQty)) < 1 ? ' (increase to at least 1).' : '.'}
+            </p>
+          )}
           <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() =>
             run(() => addHolding({ symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined }))
           } />

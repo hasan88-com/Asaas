@@ -303,23 +303,60 @@ export function ValuationCard({ data, className }: ValuationCardProps) {
         <MultiplesCell label="P/B" value={data.multiples.pb_ratio} />
       </div>
 
-      {/* Industry-P/E × EPS fair value + verdict */}
-      {data.multiples.fair_value && (
+      {/* Intrinsic (Gordon) fair value + justified P/E — headline */}
+      {(data.multiples.intrinsic_fair_value || data.multiples.fair_value) && (
         <div className="mt-3 pt-3 border-t border-line-soft">
           <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-ink-faint mb-1">
-            Sector-multiple fair value
+            {data.multiples.intrinsic_fair_value ? 'Intrinsic fair value' : 'Sector-multiple fair value'}
           </p>
           <div className="flex items-baseline gap-2 flex-wrap">
             <span className="font-display text-[20px] font-semibold text-ink">
-              ₨{parseFloat(data.multiples.fair_value).toLocaleString('en-PK', { maximumFractionDigits: 2 })}
+              ₨{parseFloat((data.multiples.intrinsic_fair_value || data.multiples.fair_value)!).toLocaleString('en-PK', { maximumFractionDigits: 2 })}
             </span>
-            <span className="font-mono text-[12px] text-ink-faint">
-              = industry P/E {data.multiples.industry_pe} × EPS {data.multiples.eps}
-            </span>
+            {data.multiples.intrinsic_fair_value ? (
+              <span className="font-mono text-[12px] text-ink-faint">
+                = EPS {data.multiples.eps} × (1+g) ÷ (WACC−g)
+                {data.multiples.wacc && `, WACC ${(parseFloat(data.multiples.wacc) * 100).toFixed(1)}%`}
+              </span>
+            ) : (
+              <span className="font-mono text-[12px] text-ink-faint">
+                = industry P/E {data.multiples.industry_pe} × EPS {data.multiples.eps}
+              </span>
+            )}
           </div>
           {data.multiples.verdict && (
             <p className="text-[13px] text-ink-soft mt-1">{data.multiples.verdict}</p>
           )}
+          <div className="flex flex-wrap gap-3 mt-2">
+            {data.multiples.justified_pe && (
+              <span className="font-mono text-[11px] text-ink-faint">
+                Justified P/E: <span className="text-ink">{data.multiples.justified_pe}</span>
+                {data.multiples.pe_ratio && <span className="text-ink-faint"> vs {data.multiples.pe_ratio} current</span>}
+              </span>
+            )}
+            {data.multiples.intrinsic_fair_value && data.multiples.sector_fair_value && (
+              <span className="font-mono text-[11px] text-ink-faint">
+                Sector check: <span className="text-ink">₨{parseFloat(data.multiples.sector_fair_value).toLocaleString('en-PK', { maximumFractionDigits: 2 })}</span>
+              </span>
+            )}
+          </div>
+          {data.multiples.flags && data.multiples.flags.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {data.multiples.flags.map((f) => (
+                <span key={f} className={cn(
+                  'font-mono text-[10px] px-2 py-0.5 rounded-full border',
+                  f === 'Significantly Overvalued' || f === 'High Risk'
+                    ? 'bg-loss/10 text-loss border-loss/30'
+                    : 'bg-info-soft text-info border-info/30',
+                )}>
+                  {f}
+                </span>
+              ))}
+            </div>
+          )}
+          <p className="text-[10px] text-ink-faint mt-2 leading-[1.4]">
+            Single-stage estimate, sensitive to (WACC − g); high local rates compress fair multiples. Not a price target.
+          </p>
         </div>
       )}
 
