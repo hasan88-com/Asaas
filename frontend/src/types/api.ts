@@ -481,28 +481,21 @@ export interface DebtInstrument {
 }
 
 /* ------------------------------------------------------------------ */
-/* Strategies — no-code allocation/screener builder                     */
+/* Watchlist — stocks / commodities / debt / crypto                     */
 /* ------------------------------------------------------------------ */
-export type StrategyKind = 'allocation' | 'screener'
-
-export interface StrategyCreateInput {
-  name: string
-  kind: StrategyKind
-  config: Record<string, unknown>
-}
-
-export interface StrategyResponse {
+export interface WatchlistItem {
   id: string
+  symbol: string
   name: string
-  kind: StrategyKind
-  config: Record<string, unknown>
+  asset_class: string   // psx_stock / global_stock / crypto / tbill / commodity / mutual_fund
+  sector?: string | null
+  currency: string
+  price?: string | null  // Decimal as string, native quote currency (PKR for PSX, USD for crypto/commodity)
   created_at: string
-  updated_at: string
 }
 
-export interface StrategyRunResult {
-  kind: StrategyKind
-  result: Record<string, unknown>
+export interface WatchlistResponse {
+  items: WatchlistItem[]
 }
 
 /* ------------------------------------------------------------------ */

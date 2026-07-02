@@ -23,8 +23,8 @@ from app.api.portfolio import router as portfolio_router
 from app.api.market import router as market_router
 from app.api.news import router as news_router
 from app.api.chat import router as chat_router
-from app.api.strategy import router as strategy_router
 from app.api.wallet import router as wallet_router
+from app.api.watchlist import router as watchlist_router
 
 settings = get_settings()
 logging.basicConfig(level=logging.INFO)
@@ -231,8 +231,8 @@ api_router.include_router(market_router)
 api_router.include_router(news_router)
 api_router.include_router(chat_router)
 api_router.include_router(analysis_router)
-api_router.include_router(strategy_router)
 api_router.include_router(wallet_router)
+api_router.include_router(watchlist_router)
 
 
 @api_router.get("/health", tags=["system"])
