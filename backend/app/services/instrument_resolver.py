@@ -1,10 +1,14 @@
 """
 Asaas (اثاثہ) — Instrument Resolver
 
-Resolves a ticker symbol to an `Instrument` row, creating it on demand for a
-valid-looking PSX symbol that hasn't been seeded yet. Without this, any PSX
-ticker not in the small hand-seeded list (HBL.KA, ENGRO.KA, ...) 404s even
-though the PSXAdapter waterfall can fetch its history live.
+Resolves a ticker symbol to an `Instrument` row, creating it on demand when
+it hasn't been seeded yet:
+- PSX tickers: validated against the symbol pattern, history fetched live via
+  the PSXAdapter waterfall, then registered.
+- Other classes (crypto / commodity / debt): registered from an explicit
+  `asset_class` hint supplied by the caller (the frontend picker knows the
+  class). Crypto/commodity rows get currency="USD" so the price cache's
+  USD→PKR conversion applies; prices arrive lazily via the cache adapters.
 """
 
 from __future__ import annotations
@@ -31,14 +35,69 @@ def _looks_like_psx_symbol(symbol: str) -> bool:
     return bool(_PSX_SYMBOL_RE.match(symbol.strip().upper()))
 
 
-async def resolve_instrument(symbol: str, db: AsyncSession) -> Optional[Instrument]:
-    """Look up an existing Instrument by symbol; if missing and the symbol
-    looks like a PSX ticker, fetch its history live and register it. Returns
-    None if the symbol can't be resolved by any path."""
+# Frontend picker hint → instruments.asset_class (bonds share the tbill class,
+# matching the seed data). Equity is absent on purpose: PSX tickers go through
+# the history-validating PSX path below.
+_HINT_CLASS = {
+    "crypto": "crypto",
+    "commodity": "commodity",
+    "tbill": "tbill",
+    "bond": "tbill",
+}
+
+_CLASS_META = {
+    "crypto": {"currency": "USD", "data_source": "coingecko", "sector": "Digital Currency"},
+    "commodity": {"currency": "USD", "data_source": "yfinance", "sector": "Commodities"},
+    "tbill": {"currency": "PKR", "data_source": "manual", "sector": "Sovereign Debt"},
+}
+
+
+async def _register_from_hint(
+    symbol: str, asset_class: str, name: Optional[str], db: AsyncSession
+) -> Optional[Instrument]:
+    """Create a non-PSX instrument row from the caller's asset-class hint."""
+    meta = _CLASS_META[asset_class]
+    stmt = (
+        pg_insert(Instrument)
+        .values(
+            symbol=symbol,
+            name=name or symbol,
+            asset_class=asset_class,
+            sector=meta["sector"],
+            currency=meta["currency"],
+            data_source=meta["data_source"],
+            metadata_={"registered": "on_demand"},
+        )
+        .on_conflict_do_nothing(index_elements=["symbol"])
+    )
+    await db.execute(stmt)
+    await db.commit()
+    result = await db.execute(select(Instrument).where(Instrument.symbol == symbol))
+    instrument = result.scalar_one_or_none()
+    if instrument is not None:
+        logger.info("Registered %s instrument on demand: %s", asset_class, symbol)
+    return instrument
+
+
+async def resolve_instrument(
+    symbol: str,
+    db: AsyncSession,
+    asset_class: Optional[str] = None,
+    name: Optional[str] = None,
+) -> Optional[Instrument]:
+    """Look up an existing Instrument by symbol; if missing, register it on
+    demand — via live PSX history for PSX-looking tickers, or directly from
+    the `asset_class` hint (crypto/commodity/tbill/bond) when the caller
+    provides one. Returns None if the symbol can't be resolved by any path."""
+    symbol = symbol.strip().upper()
     result = await db.execute(select(Instrument).where(Instrument.symbol == symbol))
     instrument = result.scalar_one_or_none()
     if instrument is not None:
         return instrument
+
+    hinted_class = _HINT_CLASS.get((asset_class or "").lower())
+    if hinted_class:
+        return await _register_from_hint(symbol, hinted_class, name, db)
 
     if not _looks_like_psx_symbol(symbol):
         return None

@@ -107,6 +107,37 @@ async def test_watchlist_duplicate_add_is_idempotent(db_session, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_watchlist_unseeded_symbol_registers_via_hint(db_session, monkeypatch):
+    """Unseeded non-PSX symbols (crypto/commodity/bond pickers) register on
+    demand from the asset_class hint instead of 404ing."""
+    monkeypatch.setattr("app.data.cache.get_prices", _fake_prices)
+    user = await _seed_user(db_session)
+    symbol = f"C{uuid4().hex[:5].upper()}"  # not seeded anywhere
+
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        async with _client() as ac:
+            res = await ac.post("/api/v1/watchlist", json={
+                "symbol": symbol, "asset_class": "crypto", "name": "Hint Coin",
+            })
+            assert res.status_code == 201
+            body = res.json()
+            assert body["symbol"] == symbol
+            assert body["asset_class"] == "crypto"
+            assert body["name"] == "Hint Coin"
+            assert body["currency"] == "USD"  # so the price cache converts to PKR
+
+            # Bond hint maps onto the tbill class used by the seed data.
+            res = await ac.post("/api/v1/watchlist", json={
+                "symbol": f"B{uuid4().hex[:5].upper()}TFC1", "asset_class": "bond", "name": "Hint TFC",
+            })
+            assert res.status_code == 201
+            assert res.json()["asset_class"] == "tbill"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+@pytest.mark.asyncio
 async def test_watchlist_unknown_symbol_404_and_foreign_delete_404(db_session):
     user = await _seed_user(db_session)
 

@@ -7,6 +7,7 @@ Pydantic schemas for portfolio and holding operations (TECH.md §7.2, §4).
 from __future__ import annotations
 
 from datetime import date, datetime
+from datetime import date as date_type  # for fields literally named `date` (name shadows the type)
 from decimal import Decimal
 from typing import Any, Dict, List, Literal, Optional
 from uuid import UUID
@@ -98,6 +99,10 @@ class AddHoldingRequest(BaseModel):
     quantity: Decimal = Field(..., gt=0)
     entry_price: Decimal = Field(..., ge=0, description="Price paid (PKR)")
     entry_date: Optional[date] = None
+    asset_class: Optional[str] = Field(
+        None, description="Picker hint (crypto/commodity/tbill/bond) to register unseeded symbols"
+    )
+    name: Optional[str] = Field(None, max_length=120, description="Display name for on-demand registration")
 
 
 class SellHoldingRequest(BaseModel):
@@ -105,7 +110,10 @@ class SellHoldingRequest(BaseModel):
     holding_id: UUID
     quantity: Decimal = Field(..., gt=0, description="Quantity sold")
     price: Decimal = Field(..., ge=0, description="Price received (PKR)")
-    date: Optional[date] = None
+    # NOTE: annotation must be the alias — a field named `date` shadows the
+    # `date` type during postponed-annotation resolution, collapsing the type
+    # to NoneType ("Input should be None" on every non-null payload).
+    date: Optional[date_type] = None
 
 
 class UpdateHoldingRequest(BaseModel):

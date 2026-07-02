@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { getWallet, depositCash, withdrawCash, getCashTransactions } from '@/lib/api'
 import { cn } from '@/lib/utils'
@@ -27,7 +27,10 @@ const TXN_LABEL: Record<string, string> = {
   sell: 'Sell',
 }
 
-export function WalletCard({ refreshKey = 0 }: { refreshKey?: number }) {
+export function WalletCard({ refreshKey = 0, onBalance }: {
+  refreshKey?: number
+  onBalance?: (balance: number) => void  // lets the Dashboard include cash in total value
+}) {
   const [balance, setBalance] = useState<string | null>(null)
   const [txns, setTxns] = useState<CashTransaction[]>([])
   const [panel, setPanel] = useState<Panel>(null)
@@ -35,9 +38,16 @@ export function WalletCard({ refreshKey = 0 }: { refreshKey?: number }) {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Ref keeps `load` stable even when the parent passes an inline callback.
+  const onBalanceRef = useRef(onBalance)
+  onBalanceRef.current = onBalance
+
   const load = useCallback(async () => {
     const [w, t] = await Promise.allSettled([getWallet(), getCashTransactions(10)])
-    if (w.status === 'fulfilled') setBalance(w.value.balance)
+    if (w.status === 'fulfilled') {
+      setBalance(w.value.balance)
+      onBalanceRef.current?.(parseFloat(w.value.balance))
+    }
     if (t.status === 'fulfilled') setTxns(t.value.items)
   }, [])
 
@@ -56,6 +66,7 @@ export function WalletCard({ refreshKey = 0 }: { refreshKey?: number }) {
       const fn = panel === 'deposit' ? depositCash : withdrawCash
       const w = await fn(amount)
       setBalance(w.balance)
+      onBalanceRef.current?.(parseFloat(w.balance))
       setPanel(null)
       setAmount('')
       await load()

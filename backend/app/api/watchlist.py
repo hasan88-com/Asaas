@@ -84,7 +84,7 @@ async def add_to_watchlist(
     from app.services.instrument_resolver import resolve_instrument
 
     symbol = payload.symbol.upper().strip()
-    inst = await resolve_instrument(symbol, db)
+    inst = await resolve_instrument(symbol, db, asset_class=payload.asset_class, name=payload.name)
     if not inst:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

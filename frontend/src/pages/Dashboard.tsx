@@ -112,6 +112,7 @@ export default function Dashboard() {
   const [loadError, setLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [walletRefreshKey, setWalletRefreshKey] = useState(0)
+  const [cashBalance, setCashBalance] = useState<number | null>(null)
 
   useEffect(() => {
     if (authLoading) return   // wait for Supabase session to settle
@@ -205,6 +206,10 @@ export default function Dashboard() {
   const riskPct = portfolio ? Math.min(parseFloat(portfolio.expected_risk) * 100, 100) : 0
   const totalValue = perf?.total_value ? parseFloat(perf.total_value) : null
   const invested = perf?.total_cost ? parseFloat(perf.total_cost) : null
+  // Headline number = investments + available cash (deposits show up immediately)
+  const totalWithCash = totalValue !== null || cashBalance !== null
+    ? (totalValue ?? 0) + (cashBalance ?? 0)
+    : null
 
   // Filter the real snapshot history to the selected range. Falls back to the
   // full series when the window has too few points (e.g. a young portfolio), so
@@ -235,13 +240,13 @@ export default function Dashboard() {
               {portfolio.name || `${portfolio.holdings.length} holdings`}
             </span>
 
-            {/* Current Value */}
+            {/* Current Value = investments + available cash */}
             <div className="flex flex-col gap-0.5">
               <span className="font-mono text-[10px] uppercase tracking-[0.18em] text-ink-faint">Current Value</span>
               <p className="font-display text-[40px] leading-[1] font-semibold text-ink tabular-nums">
-                {totalValue !== null ? (
+                {totalWithCash !== null ? (
                   <>
-                    {formatPkrFull(totalValue)}{' '}
+                    {formatPkrFull(totalWithCash)}{' '}
                     <span className="font-mono text-[14px] text-ink-faint font-normal">PKR</span>
                   </>
                 ) : (perfReady ? '—' : '…')}
@@ -250,6 +255,18 @@ export default function Dashboard() {
 
             {/* Clearly-labelled stat rows */}
             <div className="flex flex-col gap-1.5 max-w-xs">
+              {totalValue !== null && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-sans text-[12px] text-ink-soft">Investments Value</span>
+                  <span className="font-mono text-[13px] tabular-nums text-ink">{formatPkrFull(totalValue)}</span>
+                </div>
+              )}
+              {cashBalance !== null && cashBalance > 0 && (
+                <div className="flex items-baseline justify-between gap-3">
+                  <span className="font-sans text-[12px] text-ink-soft">Cash Available</span>
+                  <span className="font-mono text-[13px] tabular-nums text-ink">{formatPkrFull(cashBalance)}</span>
+                </div>
+              )}
               {pnlAbs !== null && pnlPct !== null && (
                 <div className="flex items-baseline justify-between gap-3">
                   <span className="font-sans text-[12px] text-ink-soft">Total Gain / Loss (all-time)</span>
@@ -455,8 +472,8 @@ export default function Dashboard() {
         {/* RIGHT sidebar — always rendered */}
         <aside className="flex flex-col gap-5">
 
-          {/* Cash wallet — virtual PKR balance */}
-          <WalletCard refreshKey={walletRefreshKey} />
+          {/* Cash wallet — virtual PKR balance (feeds the hero's Current Value) */}
+          <WalletCard refreshKey={walletRefreshKey} onBalance={setCashBalance} />
 
           {/* Risk Score */}
           <div className="bg-card border border-line rounded-[10px] p-5">

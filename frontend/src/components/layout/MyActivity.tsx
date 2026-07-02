@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { AssetComboBox } from '@/components/ui/combobox'
 import { ASSET_UNIVERSE, type AssetCategory } from '@/data/assetUniverse'
-import { addHolding, sellHolding, updateHolding, getProfile, putProfile } from '@/lib/api'
+import { addHolding, sellHolding, updateHolding, getProfile, putProfile, getQuote } from '@/lib/api'
 import { cn } from '@/lib/utils'
 import type { HoldingResponse, ProfileResponse } from '@/types/api'
 
@@ -46,6 +46,28 @@ export function MyActivity({
   const [buyQty, setBuyQty] = useState('')
   const [buyPrice, setBuyPrice] = useState('')
   const [buyDate, setBuyDate] = useState('')
+  const [quoteState, setQuoteState] = useState<'idle' | 'loading' | 'filled' | 'none'>('idle')
+  const quoteSymbolRef = useRef('')
+
+  // Auto-fill the price with the current market quote when a symbol is picked
+  // (any asset class — the backend converts USD quotes to PKR). Editable after.
+  useEffect(() => {
+    const sym = buySymbol.trim()
+    quoteSymbolRef.current = sym
+    if (!sym) { setQuoteState('idle'); return }
+    setQuoteState('loading')
+    getQuote(sym)
+      .then((q) => {
+        if (quoteSymbolRef.current !== sym) return // stale response — symbol changed
+        if (q.price_pkr != null) {
+          setBuyPrice(parseFloat(q.price_pkr).toFixed(2))
+          setQuoteState('filled')
+        } else {
+          setQuoteState('none')
+        }
+      })
+      .catch(() => { if (quoteSymbolRef.current === sym) setQuoteState('none') })
+  }, [buySymbol])
   // sell
   const [sellId, setSellId] = useState('')
   const [sellQty, setSellQty] = useState('')
@@ -141,10 +163,20 @@ export function MyActivity({
             <div><label className={labelCls}>Quantity</label>
               <input className={inputCls} type="number" inputMode="decimal" placeholder="0" value={buyQty} onChange={(e) => setBuyQty(e.target.value)} /></div>
             <div><label className={labelCls}>Price paid (₨)</label>
-              <input className={inputCls} type="number" inputMode="decimal" placeholder="0.00" value={buyPrice} onChange={(e) => setBuyPrice(e.target.value)} /></div>
+              <input className={inputCls} type="number" inputMode="decimal" placeholder={quoteState === 'loading' ? 'Fetching…' : '0.00'} value={buyPrice} onChange={(e) => { setBuyPrice(e.target.value); setQuoteState('idle') }} /></div>
             <div><label className={labelCls}>Date</label>
               <input className={inputCls} type="date" value={buyDate} onChange={(e) => setBuyDate(e.target.value)} /></div>
           </div>
+          {quoteState === 'filled' && (
+            <p className="font-mono text-[11px] text-ink-faint">
+              Auto-filled with the current market price — edit it if you paid a different price.
+            </p>
+          )}
+          {quoteState === 'none' && buySymbol.trim() !== '' && (
+            <p className="font-mono text-[11px] text-ink-faint">
+              No live market price for {buySymbol.trim()} — enter the price you paid.
+            </p>
+          )}
           {buyCat === 'stock' && buyQty && Number(buyQty) % 1 !== 0 && (
             <p className="font-mono text-[11px] text-ink-faint">
               Stocks trade in whole shares — this will be recorded as{' '}
@@ -152,9 +184,13 @@ export function MyActivity({
               {Math.floor(Number(buyQty)) < 1 ? ' (increase to at least 1).' : '.'}
             </p>
           )}
-          <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() =>
-            run(() => addHolding({ symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined }))
-          } />
+          <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() => {
+            const option = ASSET_UNIVERSE[buyCat].find((o) => o.symbol === buySymbol.trim())
+            return run(() => addHolding({
+              symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined,
+              asset_class: option?.assetClass, name: option?.name,
+            }))
+          }} />
         </div>
       )}
 

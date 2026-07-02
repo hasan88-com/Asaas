@@ -498,6 +498,13 @@ export interface WatchlistResponse {
   items: WatchlistItem[]
 }
 
+export interface QuoteResponse {
+  symbol: string
+  asset_class: string
+  price_pkr: string | null   // Decimal as string, already PKR-converted; null when no quote (e.g. debt)
+  as_of: string
+}
+
 /* ------------------------------------------------------------------ */
 /* Raabta AI — conversations                                           */
 /* ------------------------------------------------------------------ */
