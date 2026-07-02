@@ -640,22 +640,18 @@ export function getDebtMarket(): Promise<DebtMarketResponse> {
 }
 
 /* ------------------------------------------------------------------ */
-/* Strategies — no-code allocation/screener builder                     */
+/* Watchlist — stocks / commodities / debt / crypto                     */
 /* ------------------------------------------------------------------ */
-import type { StrategyCreateInput, StrategyResponse as StrategyResponseType, StrategyRunResult } from '@/types/api'
+import type { WatchlistItem, WatchlistResponse } from '@/types/api'
 
-export function getStrategies(): Promise<StrategyResponseType[]> {
-  return get<StrategyResponseType[]>('/strategies')
+export function getWatchlist(): Promise<WatchlistResponse> {
+  return get<WatchlistResponse>('/watchlist')
 }
 
-export function createStrategy(input: StrategyCreateInput): Promise<StrategyResponseType> {
-  return post<StrategyResponseType>('/strategies', input)
+export function addToWatchlist(symbol: string): Promise<WatchlistItem> {
+  return post<WatchlistItem>('/watchlist', { symbol })
 }
 
-export function deleteStrategy(id: string): Promise<void> {
-  return del(`/strategies/${id}`)
-}
-
-export function runStrategy(id: string): Promise<StrategyRunResult> {
-  return post<StrategyRunResult>(`/strategies/${id}/run`)
+export function removeFromWatchlist(id: string): Promise<void> {
+  return del(`/watchlist/${id}`)
 }
