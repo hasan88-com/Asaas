@@ -68,7 +68,10 @@ export default function Watchlist() {
     setAdding(true)
     setError(null)
     try {
-      await addToWatchlist(symbol.trim())
+      // Send the picker's asset class + name so unseeded symbols (crypto,
+      // commodities, bonds) get registered on demand instead of 404ing.
+      const option = ASSET_UNIVERSE[cat].find((o) => o.symbol === symbol.trim())
+      await addToWatchlist(symbol.trim(), option?.assetClass, option?.name)
       setSymbol('')
       const r = await getWatchlist() // re-fetch so the new row carries a price
       setItems(r.items)

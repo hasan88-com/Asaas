@@ -478,6 +478,7 @@ export function postQuestionnaire(
 /* ------------------------------------------------------------------ */
 export function addHolding(body: {
   symbol: string; quantity: string; entry_price: string; entry_date?: string
+  asset_class?: string; name?: string  // picker hint — registers unseeded non-PSX symbols
 }): Promise<PortfolioResponse> {
   return post<Record<string, unknown>>('/portfolio/holdings/add', body).then(transformPortfolio)
 }
@@ -648,8 +649,8 @@ export function getWatchlist(): Promise<WatchlistResponse> {
   return get<WatchlistResponse>('/watchlist')
 }
 
-export function addToWatchlist(symbol: string): Promise<WatchlistItem> {
-  return post<WatchlistItem>('/watchlist', { symbol })
+export function addToWatchlist(symbol: string, assetClass?: string, name?: string): Promise<WatchlistItem> {
+  return post<WatchlistItem>('/watchlist', { symbol, asset_class: assetClass, name })
 }
 
 export function removeFromWatchlist(id: string): Promise<void> {

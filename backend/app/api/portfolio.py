@@ -852,7 +852,9 @@ async def add_holding(
 
     portfolio = await _load_active_portfolio(current_user, db)  # 404 if no active portfolio
 
-    inst = await resolve_instrument(payload.symbol, db)
+    inst = await resolve_instrument(
+        payload.symbol, db, asset_class=payload.asset_class, name=payload.name
+    )
     if not inst:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

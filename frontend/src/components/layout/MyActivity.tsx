@@ -184,9 +184,13 @@ export function MyActivity({
               {Math.floor(Number(buyQty)) < 1 ? ' (increase to at least 1).' : '.'}
             </p>
           )}
-          <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() =>
-            run(() => addHolding({ symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined }))
-          } />
+          <ActivityFooter error={error} submitting={submitting} disabled={!buyValid} onCancel={close} onSubmit={() => {
+            const option = ASSET_UNIVERSE[buyCat].find((o) => o.symbol === buySymbol.trim())
+            return run(() => addHolding({
+              symbol: buySymbol.trim(), quantity: buyQty, entry_price: buyPrice, entry_date: buyDate || undefined,
+              asset_class: option?.assetClass, name: option?.name,
+            }))
+          }} />
         </div>
       )}
 

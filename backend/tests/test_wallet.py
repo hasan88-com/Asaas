@@ -185,9 +185,11 @@ async def test_buy_and_sell_move_cash(db_session, monkeypatch):
             assert buy_txn["symbol"] == symbol
             assert Decimal(buy_txn["amount"]) == Decimal("1000")
 
-            # Partial sell 5 @ ₨120 → credit ₨600.
+            # Partial sell 5 @ ₨120 → credit ₨600. Includes a date — guards the
+            # SellHoldingRequest.date type-shadowing regression ("Input should
+            # be None" on every dated sell).
             res = await ac.post("/api/v1/portfolio/holdings/sell", json={
-                "holding_id": holding_id, "quantity": 5, "price": 120,
+                "holding_id": holding_id, "quantity": 5, "price": 120, "date": "2026-07-02",
             })
             assert res.status_code == 200
             res = await ac.get("/api/v1/wallet")
