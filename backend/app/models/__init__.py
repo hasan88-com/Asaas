@@ -21,6 +21,8 @@ from app.models.flag import Flag
 from app.models.chat_message import ChatMessage
 from app.models.conversation import Conversation
 from app.models.strategy import Strategy
+from app.models.cash_account import CashAccount
+from app.models.cash_transaction import CashTransaction
 
 __all__ = [
     "User",
@@ -40,4 +42,6 @@ __all__ = [
     "ChatMessage",
     "Conversation",
     "Strategy",
+    "CashAccount",
+    "CashTransaction",
 ]

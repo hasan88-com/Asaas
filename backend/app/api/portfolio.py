@@ -25,6 +25,7 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.portfolio import Portfolio
 from app.models.holding import Holding
+from app.models.instrument import Instrument
 from app.schemas.portfolio import (
     AddHoldingRequest,
     ConfirmRequest,
@@ -878,6 +879,31 @@ async def add_holding(
         actual_weight=Decimal("0"),
     )
     db.add(holding)
+    await db.flush()  # assign holding.id so the ledger row can reference it
+
+    from app.services.wallet import InsufficientFundsError, debit_cash
+
+    cost = (qty * payload.entry_price).quantize(Decimal("0.01"))
+    try:
+        await debit_cash(
+            db,
+            current_user.id,
+            cost,
+            txn_type="buy",
+            holding_id=holding.id,
+            symbol=inst.symbol,
+            quantity=qty,
+            price=payload.entry_price,
+        )
+    except InsufficientFundsError as e:
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Insufficient funds: this order costs ₨{cost:,.2f} but your cash "
+                f"balance is ₨{e.balance:,.2f}. Deposit cash to continue."
+            ),
+        )
     await db.commit()
     background_tasks.add_task(_write_initial_snapshot, portfolio.id)
     from app.workers.warm_prices import run_warm_prices
@@ -919,10 +945,30 @@ async def sell_holding(
             detail="Insufficient holdings.",
         )
 
-    if payload.quantity == held:
+    # Capture instrument symbol before a possible full-liquidation delete.
+    inst_res = await db.execute(select(Instrument).where(Instrument.id == holding.instrument_id))
+    sold_instrument = inst_res.scalar_one_or_none()
+    sold_symbol = sold_instrument.symbol if sold_instrument else None
+
+    full_liquidation = payload.quantity == held
+    if full_liquidation:
         await db.delete(holding)
     else:
         holding.quantity = held - payload.quantity
+
+    from app.services.wallet import credit_cash
+
+    proceeds = (payload.quantity * payload.price).quantize(Decimal("0.01"))
+    await credit_cash(
+        db,
+        current_user.id,
+        proceeds,
+        txn_type="sell",
+        holding_id=None if full_liquidation else holding.id,
+        symbol=sold_symbol,
+        quantity=payload.quantity,
+        price=payload.price,
+    )
 
     await db.commit()
     background_tasks.add_task(_write_initial_snapshot, portfolio.id)

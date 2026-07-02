@@ -13,6 +13,7 @@ import { PerformanceLine } from '@/components/charts/PerformanceLine'
 import { AllocationDonut } from '@/components/charts/AllocationDonut'
 import { FlagCard } from '@/components/layout/FlagCard'
 import { MyActivity } from '@/components/layout/MyActivity'
+import { WalletCard } from '@/components/layout/WalletCard'
 import { MarketSentimentGauge } from '@/components/layout/MarketSentimentGauge'
 import { RiskPanel } from '@/components/layout/RiskPanel'
 import { cn } from '@/lib/utils'
@@ -110,6 +111,7 @@ export default function Dashboard() {
   // "Build your first portfolio" empty state.
   const [loadError, setLoadError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
+  const [walletRefreshKey, setWalletRefreshKey] = useState(0)
 
   useEffect(() => {
     if (authLoading) return   // wait for Supabase session to settle
@@ -180,6 +182,7 @@ export default function Dashboard() {
   // Re-fetch portfolio + performance after a portfolio-activity change.
   // Use live=true so the user sees accurate post-change figures (incl. per-holding).
   async function refresh() {
+    setWalletRefreshKey((k) => k + 1) // buys/sells move cash
     const [p, pf] = await Promise.allSettled([getPortfolio(), getPerformance({ live: true })])
     if (p.status === 'fulfilled') setPortfolio(p.value)
     if (pf.status === 'fulfilled') setPerf(pf.value)
@@ -451,6 +454,9 @@ export default function Dashboard() {
 
         {/* RIGHT sidebar — always rendered */}
         <aside className="flex flex-col gap-5">
+
+          {/* Cash wallet — virtual PKR balance */}
+          <WalletCard refreshKey={walletRefreshKey} />
 
           {/* Risk Score */}
           <div className="bg-card border border-line rounded-[10px] p-5">

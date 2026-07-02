@@ -77,8 +77,8 @@ export function MyActivity({
       await onChanged()
       close()
     } catch (e) {
-      const s = (e as { status?: number }).status
-      setError(s === 422 ? 'Insufficient holdings.' : (e instanceof Error ? e.message : 'Something went wrong.'))
+      // ApiError.message carries the backend `detail` (e.g. "Insufficient funds: …")
+      setError(e instanceof Error && e.message ? e.message : 'Something went wrong.')
       setSubmitting(false)
     }
   }

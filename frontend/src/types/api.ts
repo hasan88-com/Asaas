@@ -521,3 +521,32 @@ export interface ConversationMessage {
   content: string
   created_at: string
 }
+
+/* ------------------------------------------------------------------ */
+/* Wallet — virtual PKR cash                                           */
+/* ------------------------------------------------------------------ */
+export interface WalletResponse {
+  balance: string   // Decimal as string
+  currency: string
+  created_at: string
+}
+
+export type CashTransactionType = 'deposit' | 'withdrawal' | 'buy' | 'sell'
+
+export interface CashTransaction {
+  id: string
+  type: CashTransactionType
+  amount: string          // Decimal as string, always positive; sign implied by type
+  balance_after: string
+  symbol?: string | null
+  quantity?: string | null
+  price?: string | null
+  status: string
+  note?: string | null
+  created_at: string
+}
+
+export interface TransactionListResponse {
+  items: CashTransaction[]
+  total: number
+}

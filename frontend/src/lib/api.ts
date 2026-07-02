@@ -22,6 +22,8 @@ import type {
   RiskMetricsResponse,
   Conversation,
   ConversationMessage,
+  WalletResponse,
+  TransactionListResponse,
 } from '@/types/api'
 import type { SSEEvent } from '@/types/chat'
 
@@ -87,13 +89,24 @@ async function withSessionRetry<T>(path: string, fn: () => Promise<T>): Promise<
   }
 }
 
+/** Build an ApiError whose message is the backend's `detail` when present,
+ *  so callers can surface real error text (e.g. "Insufficient funds: …"). */
+async function toApiError(method: string, path: string, res: Response): Promise<ApiError> {
+  let detail = ''
+  try {
+    const body = await res.json() as { detail?: unknown }
+    if (body.detail) detail = typeof body.detail === 'string' ? body.detail : JSON.stringify(body.detail)
+  } catch { /* non-JSON body — keep generic message */ }
+  return new ApiError(detail || `${method} ${path} → ${res.status}`, res.status)
+}
+
 async function get<T>(path: string, timeoutMs = 30000): Promise<T> {
   return withSessionRetry(path, async () => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
       const res = await fetch(`${BASE}${path}`, { headers: await authHeaders(), signal: controller.signal })
-      if (!res.ok) throw new ApiError(`GET ${path} → ${res.status}`, res.status)
+      if (!res.ok) throw await toApiError('GET', path, res)
       return res.json() as Promise<T>
     } finally {
       clearTimeout(timer)
@@ -108,7 +121,7 @@ async function post<T>(path: string, body?: unknown): Promise<T> {
       headers: await authHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
-    if (!res.ok) throw new ApiError(`POST ${path} → ${res.status}`, res.status)
+    if (!res.ok) throw await toApiError('POST', path, res)
     return res.json() as Promise<T>
   })
 }
@@ -120,7 +133,7 @@ async function put<T>(path: string, body?: unknown): Promise<T> {
       headers: await authHeaders(),
       body: body !== undefined ? JSON.stringify(body) : undefined,
     })
-    if (!res.ok) throw new ApiError(`PUT ${path} → ${res.status}`, res.status)
+    if (!res.ok) throw await toApiError('PUT', path, res)
     return res.json() as Promise<T>
   })
 }
@@ -131,7 +144,7 @@ async function del(path: string): Promise<void> {
       method: 'DELETE',
       headers: await authHeaders(),
     })
-    if (!res.ok) throw new ApiError(`DELETE ${path} → ${res.status}`, res.status)
+    if (!res.ok) throw await toApiError('DELETE', path, res)
   })
 }
 
@@ -503,6 +516,25 @@ export function getDiversification(portfolioId?: string): Promise<Diversificatio
 export function reoptimize(flagId?: string): Promise<PortfolioResponse> {
   const qs = flagId ? `?flag_id=${flagId}` : ''
   return post<Record<string, unknown>>(`/portfolio/reoptimize${qs}`).then(transformPortfolio)
+}
+
+/* ------------------------------------------------------------------ */
+/* Wallet — virtual PKR cash                                            */
+/* ------------------------------------------------------------------ */
+export function getWallet(): Promise<WalletResponse> {
+  return get<WalletResponse>('/wallet')
+}
+
+export function depositCash(amount: string, note?: string): Promise<WalletResponse> {
+  return post<WalletResponse>('/wallet/deposit', { amount, note })
+}
+
+export function withdrawCash(amount: string, note?: string): Promise<WalletResponse> {
+  return post<WalletResponse>('/wallet/withdraw', { amount, note })
+}
+
+export function getCashTransactions(limit = 50, offset = 0): Promise<TransactionListResponse> {
+  return get<TransactionListResponse>(`/wallet/transactions?limit=${limit}&offset=${offset}`)
 }
 
 /* ------------------------------------------------------------------ */
