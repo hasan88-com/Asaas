@@ -655,3 +655,12 @@ export function addToWatchlist(symbol: string): Promise<WatchlistItem> {
 export function removeFromWatchlist(id: string): Promise<void> {
   return del(`/watchlist/${id}`)
 }
+
+/* ------------------------------------------------------------------ */
+/* Market quote — PKR price for the buy form's auto-fill                */
+/* ------------------------------------------------------------------ */
+import type { QuoteResponse } from '@/types/api'
+
+export function getQuote(symbol: string): Promise<QuoteResponse> {
+  return get<QuoteResponse>(`/market/quote/${encodeURIComponent(symbol)}`)
+}

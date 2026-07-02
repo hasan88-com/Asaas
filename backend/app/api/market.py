@@ -76,6 +76,41 @@ async def get_price(
     )
 
 
+@router.get("/quote/{symbol}")
+async def get_quote(
+    symbol: str,
+    db: AsyncSession = Depends(get_db),
+) -> Dict[str, Any]:
+    """
+    Current market price in PKR for any asset class — powers the buy form's
+    price auto-fill. Uses the read-through cache (Redis → DB → live adapter);
+    USD-quoted instruments (crypto/commodities) come back already converted.
+    Returns price_pkr: null when no quote exists (e.g. debt instruments).
+    """
+    from app.data.cache import get_price as cache_get_price
+    from app.services.instrument_resolver import resolve_instrument
+
+    instrument = await resolve_instrument(symbol, db)
+    if not instrument:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Instrument {symbol} not found.",
+        )
+
+    try:
+        price_pkr = await cache_get_price(instrument.symbol, db)
+    except Exception:
+        logger.exception("Quote lookup failed for %s", instrument.symbol)
+        price_pkr = None
+
+    return {
+        "symbol": instrument.symbol,
+        "asset_class": instrument.asset_class,
+        "price_pkr": str(price_pkr) if price_pkr is not None else None,
+        "as_of": datetime.now(timezone.utc).isoformat(),
+    }
+
+
 @router.get("/search", response_model=List[SearchResult])
 async def search_market(
     query: str = Query(..., min_length=1),
