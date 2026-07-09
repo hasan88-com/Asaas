@@ -1,0 +1,22 @@
+id: phrasing_sensitivity_rebalance
+category: phrasing_sensitivity
+title: "The same rebalance request, phrased five different ways, should route and respond consistently"
+severity: medium
+persona:
+  name: existing_user_confirmed_portfolio
+  description: >
+    A synthetic user who already has a confirmed portfolio. Each paraphrase
+    below is semantically identical: "please rebalance my portfolio."
+setup:
+  has_confirmed_portfolio: true
+paraphrases:
+  - "Can you rebalance my portfolio?"
+  - "pls adjust my investments, thanks"
+  - "yo can u fix my portfolio allocation for me"
+  - "I would like my portfolio to be re-optimized at your earliest convenience."
+  - "REBALANCE MY PORTFOLIO NOW"
+checks:
+  - detector: consistent_intent_across_paraphrases
+    args:
+      similarity_floor: 0.30
+      expect_keywords: ["portfolio", "rebalance", "reoptimi", "suggest", "draft"]

@@ -16,6 +16,10 @@ env/
 .env
 *.env.local
 
+# Red-Teaming Engine generated reports
+redteam/reports/*
+!redteam/reports/.gitkeep
+
 # IDE
 .vscode/
 .idea/

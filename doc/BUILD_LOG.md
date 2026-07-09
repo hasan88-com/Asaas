@@ -168,6 +168,24 @@ Keep entries short and factual. This is a log, not prose. A change is not done u
 | `backend/tests/test_valuation.py` | done | 6 tests: WACC=SBP+ERP, MC distribution, thin-data no-fabrication, Decimal money, no buy/sell in prompt, PII guard |
 | `backend/tests/test_technical.py` | done | 9 tests: RSI/MFI/MACD fixtures, MA exact values, golden/death cross, no DB writes, daily-data prompt note, PII guard |
 
+### Red-Teaming Engine (PS1 hackathon submission — separate track, not deployed with the app)
+| File | Status | Purpose |
+|---|---|---|
+| `redteam/README.md` | done | What the engine is, how it maps to PS1's 6 risk categories, how to run it (HTTP or direct-to-orchestrator) |
+| `redteam/requirements.txt` | done | Standalone deps: pyyaml, httpx, pytest, pytest-asyncio |
+| `redteam/engine/scenario.py` | done | Scenario/Persona/Check dataclasses + YAML loader/validator (6 fixed risk categories, 4 severities) |
+| `redteam/engine/results.py` | done | Turn / RunResult / DetectorOutcome data model |
+| `redteam/engine/runner.py` | done | Drives a scenario (turn-script or paraphrase-set) against a TargetAdapter |
+| `redteam/engine/detectors.py` | done | 9 heuristic detectors (regex/lexical, no LLM judge) — disclaimer, no-fabrication, no-premature-advice, certainty-denylist (negation-aware), hallucination-grounding, no-pretend-action, portfolio-state-unchanged, audit-trail-completeness, paraphrase-consistency |
+| `redteam/engine/scorer.py` | done | Aggregates DetectorOutcomes into a Report (by category, by severity, pass rate) |
+| `redteam/engine/report.py` | done | Renders Markdown / HTML / JSON |
+| `redteam/engine/targets/base.py` | done | TargetAdapter protocol (`new_session`/`send`/`get_state`) — deployment-agnostic |
+| `redteam/engine/targets/http_adapter.py` | done | Generic adapter for any chat API (Asaas-style SSE content-delta, or plain JSON) — works against a 2nd team's advice API too |
+| `redteam/engine/targets/asaas_direct.py` | done | Drives `AgentOrchestrator` directly against a DB session; exposes portfolio-status + `chat_messages.tool_calls` ground truth for the deep checks |
+| `redteam/scenarios/*.yaml` (7 files) | done | Scenario library — all 6 PS1 risk categories covered |
+| `redteam/cli.py` | done | `python -m redteam.cli --target direct\|http ...` |
+| `redteam/tests/*.py` (5 files) | done | 41 tests: scenario validation, all 9 detectors, runner (fake in-memory target), scorer/report, HTTP adapter against `httpx.MockTransport` — none require a live DB or LLM keys |
+
 ### Frontend — Phase 5: Scaffold + Agent Conversation UI
 | File | Status | Purpose |
 |---|---|---|
@@ -247,6 +265,12 @@ Keep entries short and factual. This is a log, not prose. A change is not done u
 ## 2. Change history
 
 _Newest first. One entry per change set._
+
+### 2026-07-09 — Red-Teaming Engine (PS1 hackathon submission) + secret rotation fix
+- created: `redteam/` — new top-level module (not imported by or deployed with the FastAPI app). Adversarial red-team harness for PS1 ("Agentic Financial and High-Stakes AI Advice"): synthetic personas + scripted/paraphrased scenarios stress-test an advice API (Asaas by default, but the target adapter is deployment-agnostic) for the 6 PS1 risk categories: guessing missing details, premature advice, silent compliance failure, phrasing sensitivity, unfaithful/hallucinated reasoning, broken audit trail. See `redteam/README.md` for full architecture and usage; §1 file registry above has the per-file breakdown
+- verified: full pipeline (CLI → HTTP adapter → runner → 9 detectors → scorer → Markdown/HTML/JSON report) run end-to-end against a real local socket server (not mocked) with deliberately-planted violations — correctly caught the guessing-missing-details and certainty-denylist failures, passed the compliant case. 41 unit/integration tests pass with zero backend dependencies installed (pyyaml + httpx + pytest only)
+- found (not yet fixed): `audit_trail_probe_01` fails against Asaas's real behavior — `chat_messages.tool_calls` (`backend/app/models/chat_message.py`) only ever persists `{"agent_role": ...}` (`backend/app/api/chat.py::_agent_sse_generator`), not the tool name/input/output needed to reconstruct why a piece of advice was given. Logged here as a live finding the new engine surfaced; fixing Asaas's own audit logging is separate follow-up work
+- edited: `.env.example` — replaced live Supabase service key, JWT secret, DB password, and Gemini/Groq/OpenRouter/CoinGecko/FRED/AlphaVantage API keys (committed since `30ab179`, 2026-06-26) with placeholders. **The underlying credentials still need to be rotated in Supabase and each provider console** — this commit only removes them from the tracked file, it does not invalidate anything already exposed in git history
 
 ### 2026-06-23 — Agent conversation memory + optimizer intent-aware tool wiring
 - created: `backend/app/agent/memory.py` — `format_history()` pure helper; renders last-N chat turns as a labeled block (`Recent conversation:` + `User:`/`Asaas:` lines); returns `""` on empty/blank so roles can append unconditionally. Tolerates junk entries
@@ -542,3 +566,5 @@ _One-paragraph snapshot of where the build stands. Update at each milestone._
 > **2026-06-26 — Phase B (optimizer rewrite):** Replaced the broken optimizer (it imported `pyptfopt`—a typo—so it *always* fell back to fixed heuristic weights) with a real **numpy/scipy** implementation: aligned daily returns → annualized μ → **Ledoit-Wolf identity-target shrinkage** (closed-form δ, PSD) → SLSQP for **max_sharpe / min_vol / risk_parity** + **HRP** (`scipy.cluster.hierarchy`), plus `efficient_return/efficient_risk/efficient_frontier`. Method selector with per-profile default (`PROFILE_OPTIMIZER_METHOD` registered in `capabilities.py`); keeps crypto/sector caps + heuristic fallback when data is thin; SBP rate = r_f; Decimal at the boundary. Verified on the backfilled DB (all 4 methods sum to 1, caps respected). Spike result: `psx-data-reader` has **no KSE-100 index** → Phase-C beta benchmark will use an **equal-weight PSX-stock composite proxy** (option a).
 
 > **2026-06-26 — Phase C (risk analytics):** New `services/risk.py` (pure-numpy helpers + DB orchestration): historical/parametric **VaR** (95/99), **CVaR**, **max drawdown** + duration, rolling **vol/Sharpe** (30d), **Sortino**, and **beta** vs an equal-weight **PSX-stock composite proxy** (Yahoo `^KSE` delisted, PSX serves no index). Reads the backfilled `prices` table, date-intersects held instruments, weights by current value; every metric carries `value/as_of/source/stale`. New `GET /portfolio/risk` (5-min cache, fail-open) + `RISK_METRICS` scope in `capabilities.py`. `valuation.compute_beta` now uses the DB proxy (`risk.compute_asset_beta`) when a session is passed (analysis endpoint threads `db` through `extract_company_info`) → fixes blank PSX beta (HBL≈0.73 live). Frontend: `getRiskMetrics` + `RiskMetricsResponse` + a Dashboard **Risk** card. Verified: 8 risk + 8 optimizer unit tests, Dashboard 18/18, tsc clean, live DB sanity. **A→B→C complete.** Note: ENGRO's psx-data-reader history ends 2025-01, which currently caps the proxy/portfolio common-date window — re-source ENGRO to extend it.
+
+> **2026-07-09 — Red-Teaming Engine (PS1 hackathon submission):** New top-level `redteam/` module — a deployment-agnostic adversarial harness that stress-tests agentic advice APIs against PS1's 6 named risks (guessing missing details, premature advice, silent compliance failure, phrasing sensitivity, unfaithful reasoning, broken audit trail). 7 scenarios, 9 heuristic detectors, HTTP + direct-to-orchestrator target adapters, Markdown/HTML/JSON reporting. 41 tests pass with only pyyaml/httpx/pytest installed (no live DB/LLM keys needed); separately verified end-to-end against a real local socket server with planted violations — correctly flagged 2/3, passed 1/3. **Live finding surfaced, not yet fixed:** `chat_messages.tool_calls` only ever persists `{"agent_role": ...}`, not enough to reconstruct why advice was given (`audit_trail_probe_01` fails against real Asaas). **Also this session:** rotated-credentials fix — `.env.example` had live Supabase/DB/LLM/data-source secrets committed since 2026-06-26; scrubbed to placeholders (actual key rotation in Supabase/provider consoles is still outstanding, tracked separately).
